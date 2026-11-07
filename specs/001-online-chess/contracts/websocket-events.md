@@ -49,9 +49,10 @@ accepted only when validated against authoritative position and move history.
 ## Server events
 
 - `match_ready`: second seat joined; includes opposing colors, initial position, version,
-  chosen clock control, initial remaining times, White as active color, and server timestamp.
+  chosen clock control, initial remaining times, White as active color, server timestamp,
+  check status, and claimable draw methods.
 - `move_accepted`: accepted move, resulting position, next turn, version, whether the move
-  gives check, updated clock snapshot, and optional result.
+  gives check, claimable draw methods, updated clock snapshot, and optional result.
 - `action_rejected`: private error code/message; no state change.
 - `draw_offer`: offer identifier and offering color.
 - `draw_resolved`: offer outcome and current match status.

@@ -10,6 +10,7 @@ const initial: MatchState = {
   version: 1,
   timeControl: "3+2",
   inCheck: false,
+  eligibleDraws: [],
   clock: {
     white_remaining_ms: 180000,
     black_remaining_ms: 180000,
@@ -17,6 +18,9 @@ const initial: MatchState = {
     as_of: "2026-11-07T12:00:00Z",
   },
   result: "",
+  drawOffer: null,
+  notice: "",
+  opponentConnected: false,
   error: "",
   syncRequired: false,
 };
@@ -36,6 +40,7 @@ describe("match realtime reducer", () => {
       },
       result: "",
       in_check: false,
+      eligible_draws: [],
     });
     expect(next.position).toBe("after-e4");
     expect(next.currentTurn).toBe("black");
@@ -46,12 +51,12 @@ describe("match realtime reducer", () => {
   it("ignores duplicate events and requests synchronization on a version gap", () => {
     const duplicate = matchReducer(initial, {
       type: "move_accepted", version: 1, position: "stale", next_turn: "black",
-      clock: initial.clock, result: "", in_check: false,
+      clock: initial.clock, result: "", in_check: false, eligible_draws: [],
     });
     expect(duplicate).toBe(initial);
     const gap = matchReducer(initial, {
       type: "move_accepted", version: 3, position: "unknown", next_turn: "black",
-      clock: initial.clock, result: "", in_check: false,
+      clock: initial.clock, result: "", in_check: false, eligible_draws: [],
     });
     expect(gap.syncRequired).toBe(true);
     expect(gap.position).toBe(initial.position);
@@ -83,5 +88,28 @@ describe("match realtime reducer", () => {
     expect(ended.status).toBe("completed");
     expect(ended.result).toBe("0-1");
     expect(ended.clock.white_remaining_ms).toBe(0);
+  });
+
+  it("shows an incoming draw offer and clears it when declined", () => {
+    const offered = matchReducer(initial, {
+      type: "draw_offer", offer_id: "offer-1", offering_color: "black",
+    } as never) as MatchState & { drawOffer?: { offer_id: string; offering_color: string } };
+    expect(offered.drawOffer).toEqual({ offer_id: "offer-1", offering_color: "black" });
+    const declined = matchReducer(offered, {
+      type: "draw_resolved", offer_id: "offer-1", status: "declined", version: 1,
+    } as never) as MatchState & { drawOffer?: unknown; notice?: string };
+    expect(declined.drawOffer).toBeNull();
+    expect(declined.notice).toBe("Draw declined");
+  });
+
+  it("updates opponent connection state but ignores its own presence event", () => {
+    const connected = matchReducer(initial, {
+      type: "opponent_connection", color: "black", connected: true,
+    } as never) as MatchState & { opponentConnected?: boolean };
+    expect(connected.opponentConnected).toBe(true);
+    const own = matchReducer(connected, {
+      type: "opponent_connection", color: "white", connected: false,
+    } as never) as MatchState & { opponentConnected?: boolean };
+    expect(own.opponentConnected).toBe(true);
   });
 });

@@ -135,19 +135,19 @@ claims while preserving authoritative board and clock state.
 
 > Write each test first and verify the expected behavior failure before implementation.
 
-- [ ] T044 [P] [US3] Write failing recovery tests for valid/invalid seat credentials, current board/version, and server-derived remaining clock values in `internal/match/recovery_test.go`.
-- [ ] T045 [P] [US3] Write failing termination tests for resignation, draw offer acceptance/decline, rule-based draw claims, and rejection after completion in `internal/match/termination_test.go`.
-- [ ] T046 [P] [US3] Write failing React tests for reconnect loading, opponent connection status, game result, and draw offer actions in `web/src/features/game/MatchRecovery.test.tsx`.
-- [ ] T047 [P] [US3] Write a failing browser test for reconnect during a running clock and restoration of the latest accepted state in `web/e2e/recovery.spec.ts`.
-- [ ] T048 [P] [US3] Write a failing browser test for resignation, draw acceptance, and draw decline in `web/e2e/termination.spec.ts`.
+- [X] T044 [P] [US3] Write failing recovery tests for valid/invalid seat credentials, current board/version, and server-derived remaining clock values in `tests/integration/recovery_test.go`.
+- [X] T045 [P] [US3] Write failing termination tests for resignation, draw offer acceptance/decline, rule-based draw claims, and rejection after completion in `internal/match/termination_test.go` and `tests/integration/termination_test.go`.
+- [X] T046 [P] [US3] Write failing React tests for reconnect loading, opponent connection status, game result, and draw offer/draw-claim actions in `web/src/features/game/MatchRecovery.test.tsx`.
+- [X] T047 [P] [US3] Write a failing browser test for reconnect during a running clock and restoration of the latest accepted state in `web/e2e/recovery.spec.ts`.
+- [X] T048 [P] [US3] Write a failing browser test for resignation, draw acceptance, and draw decline in `web/e2e/termination.spec.ts`.
 
 ### Implementation for User Story 3
 
-- [ ] T049 [US3] Implement seat recovery in `internal/match/recovery.go` and `internal/transport/http/recovery.go`; validate the separate high-entropy recovery credential and derive current time from the persisted server anchor without pausing the clock.
-- [ ] T050 [US3] Implement resign, draw offer/response, and chess draw-claim handling in `internal/match/termination.go` and `internal/transport/http/termination.go`; only the opposing seat can resolve a pending draw offer and terminal games reject further actions.
-- [ ] T051 [US3] Add recovery snapshots and connection status events to `internal/transport/realtime/events.go`; send current board, version, result, and clock state before resuming live events.
-- [ ] T052 [US3] Implement React recovery, connection status, resign, draw offer, and result UI in `web/src/features/game/MatchRecovery.tsx` and `web/src/features/game/GameActions.tsx`; make `web/src/features/game/MatchRecovery.test.tsx` pass.
-- [ ] T053 [US3] Integrate recovery and termination controls into `web/src/features/game/GameView.tsx`; make `web/e2e/recovery.spec.ts` and `web/e2e/termination.spec.ts` pass.
+- [X] T049 [US3] Implement seat recovery in `internal/match/service.go` and `internal/transport/http/matches.go`; validate the separate high-entropy recovery credential and derive current time from the persisted server anchor without pausing the clock.
+- [X] T050 [US3] Implement resign, draw offer/response, and chess draw-claim handling in `internal/match/termination.go`, `internal/store/postgres/matches.go`, and `internal/transport/http/matches.go`; only the opposing seat can resolve a pending draw offer and terminal games reject further actions.
+- [X] T051 [US3] Add recovery snapshots and connection status events to `internal/transport/realtime/session.go` and `internal/transport/http/matches.go`; send current board, version, result, and clock state before resuming live events.
+- [X] T052 [US3] Implement React recovery, connection status, resign, draw offer, draw-claim, and result UI in `web/src/features/match/MatchLobby.tsx`, `web/src/features/game/GameActions.tsx`, and `web/src/features/game/GameView.tsx`; make `web/src/features/game/MatchRecovery.test.tsx` pass.
+- [X] T053 [US3] Integrate recovery and termination controls into `web/src/features/game/GameView.tsx`; make `web/e2e/recovery.spec.ts` and `web/e2e/termination.spec.ts` pass.
 
 **Checkpoint**: Reconnected players resume the latest durable game and clock state; every
 match ending is consistent for both players.

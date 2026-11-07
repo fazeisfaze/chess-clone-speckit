@@ -9,8 +9,12 @@ export type MatchState = {
   version: number;
   timeControl: "3+2" | "5+0" | "10+0";
   inCheck: boolean;
+  eligibleDraws: string[];
   clock: ClockView;
   result: string;
+  drawOffer: { offer_id: string; offering_color: "white" | "black" } | null;
+  notice: string;
+  opponentConnected: boolean;
   error: string;
   syncRequired: boolean;
 };
@@ -23,6 +27,7 @@ type MoveEvent = {
   clock: ClockView;
   result: string;
   in_check: boolean;
+  eligible_draws: string[];
 };
 
 type RealtimeEvent = MoveEvent
@@ -37,15 +42,33 @@ type RealtimeEvent = MoveEvent
 		version: number;
 		time_control: MatchState["timeControl"];
 		in_check: boolean;
+		eligible_draws: string[];
 		clock: ClockView;
 		result?: string;
 	}
 	| { type: "game_ended"; version: number; result: string; clock: ClockView }
-	| { type: "clock_expired"; version: number; result: string; clock: ClockView };
+	| { type: "clock_expired"; version: number; result: string; clock: ClockView }
+	| { type: "draw_offer"; offer_id: string; offering_color: "white" | "black" }
+	| { type: "draw_resolved"; offer_id: string; status: "accepted" | "declined"; version: number }
+	| { type: "opponent_connection"; color: "white" | "black"; connected: boolean };
 
 export function matchReducer(state: MatchState, event: RealtimeEvent): MatchState {
 	if (event.type === "action_rejected") {
 		return { ...state, error: event.message };
+	}
+	if (event.type === "draw_offer") {
+		return { ...state, drawOffer: { offer_id: event.offer_id, offering_color: event.offering_color }, notice: "" };
+	}
+	if (event.type === "draw_resolved") {
+		return {
+			...state,
+			drawOffer: null,
+			notice: event.status === "declined" ? "Draw declined" : "Draw accepted",
+		};
+	}
+	if (event.type === "opponent_connection") {
+		if (event.color === state.color) return state;
+		return { ...state, opponentConnected: event.connected };
 	}
 	if (event.type === "match_snapshot") {
 		return {
@@ -57,8 +80,12 @@ export function matchReducer(state: MatchState, event: RealtimeEvent): MatchStat
 			version: event.version,
 			timeControl: event.time_control,
 			inCheck: event.in_check,
+			eligibleDraws: event.eligible_draws,
 			clock: event.clock,
 			result: event.result ?? "",
+			drawOffer: null,
+			notice: "",
+			opponentConnected: false,
 			error: "",
 			syncRequired: false,
 		};
@@ -73,6 +100,7 @@ export function matchReducer(state: MatchState, event: RealtimeEvent): MatchStat
 		...state,
 		position: event.position,
 		inCheck: event.in_check,
+		eligibleDraws: event.eligible_draws,
 		currentTurn: event.next_turn,
 		version: event.version,
 		clock: event.clock,

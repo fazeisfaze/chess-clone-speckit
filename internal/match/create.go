@@ -41,6 +41,7 @@ type Match struct {
 	Result            string
 	TerminationReason string
 	InCheck           bool
+	EligibleDraws     []string
 }
 
 type PlayerSeat struct {

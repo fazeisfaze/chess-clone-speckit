@@ -26,7 +26,12 @@ func NewApplication(cfg config.Config, pool *pgxpool.Pool) *Application {
 	mux.HandleFunc("POST /matches", endpoints.create)
 	mux.HandleFunc("POST /matches/join", endpoints.join)
 	mux.HandleFunc("GET /matches/{match_id}", endpoints.get)
+	mux.HandleFunc("POST /matches/{match_id}/recover", endpoints.recover)
 	mux.HandleFunc("POST /matches/{match_id}/moves", endpoints.move)
+	mux.HandleFunc("POST /matches/{match_id}/resign", endpoints.resign)
+	mux.HandleFunc("POST /matches/{match_id}/draw-offers", endpoints.offerDraw)
+	mux.HandleFunc("POST /matches/{match_id}/draw-offers/{offer_id}/resolve", endpoints.resolveDraw)
+	mux.HandleFunc("POST /matches/{match_id}/draw-claims", endpoints.claimDraw)
 	mux.Handle("GET /matches/{match_id}/events", realtime.NewSessionHandler(realtime.SessionOptions{
 		AllowedOrigin: cfg.AllowedOrigin,
 		Authorize: func(ctx context.Context, matchID, credential string) bool {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createMatch, joinMatch, readMatch, type MatchResponse } from "./matchClient";
+import { createMatch, joinMatch, readMatch, recoverMatch, type MatchResponse } from "./matchClient";
 import { GameView } from "../game/GameView";
 
 const INITIAL_PIECES = [
@@ -49,9 +49,31 @@ export function MatchLobby() {
   const [timeControl, setTimeControl] = useState<MatchResponse["time_control"]>("5+0");
   const [match, setMatch] = useState<MatchResponse | null>(null);
   const [inviteURL, setInviteURL] = useState("");
-  const [recoveryCredential, setRecoveryCredential] = useState("");
+  const [savedSeat] = useState(() => {
+    try {
+      const raw = window.sessionStorage.getItem("online-chess-seat");
+      return raw ? JSON.parse(raw) as { match_id: string; recovery_credential: string } : null;
+    } catch {
+      return null;
+    }
+  });
+  const [recoveryCredential, setRecoveryCredential] = useState(savedSeat?.recovery_credential ?? "");
+  const [isRestoring, setIsRestoring] = useState(Boolean(savedSeat));
   const [error, setError] = useState("");
   const inviteToken = useMemo(tokenFromLocation, []);
+
+  useEffect(() => {
+    if (!savedSeat) return;
+    let mounted = true;
+    void recoverMatch(savedSeat.match_id, savedSeat.recovery_credential).then((restored) => {
+      if (mounted) setMatch(restored);
+    }).catch((reason: unknown) => {
+      if (mounted) setError(reason instanceof Error ? reason.message : "Unable to recover match.");
+    }).finally(() => {
+      if (mounted) setIsRestoring(false);
+    });
+    return () => { mounted = false; };
+  }, [savedSeat]);
 
   useEffect(() => {
     if (match?.status !== "waiting" || !recoveryCredential) return;
@@ -78,6 +100,10 @@ export function MatchLobby() {
       setMatch(created);
       setInviteURL(created.invite_url ?? "");
       setRecoveryCredential(created.recovery_credential);
+      window.sessionStorage.setItem("online-chess-seat", JSON.stringify({
+        match_id: created.match_id,
+        recovery_credential: created.recovery_credential,
+      }));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to create match.");
     }
@@ -89,12 +115,18 @@ export function MatchLobby() {
       const joined = await joinMatch(inviteToken);
       setMatch(joined);
       setRecoveryCredential(joined.recovery_credential);
+      window.sessionStorage.setItem("online-chess-seat", JSON.stringify({
+        match_id: joined.match_id,
+        recovery_credential: joined.recovery_credential,
+      }));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to join match.");
     }
   }
 
   if (match?.status === "active") return <ActiveMatch match={match} recoveryCredential={recoveryCredential} />;
+
+  if (isRestoring) return <section className="match-lobby" aria-live="polite">Recovering match…</section>;
 
   return (
     <section className="match-lobby" aria-labelledby="lobby-title">

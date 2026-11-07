@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -147,6 +148,17 @@ func (s *MatchStore) ReadForSeat(ctx context.Context, matchID string, credential
 	if startedAt.Valid {
 		game.ClockStartedAt = &startedAt.Time
 	}
+	if game.Status == match.StatusActive {
+		history, err := loadMoveHistory(ctx, s.Pool, game.ID)
+		if err != nil {
+			return match.Match{}, "", err
+		}
+		rules, err := chess.NewGameFromMoves(history)
+		if err != nil || rules.FEN() != game.Position {
+			return match.Match{}, "", fmt.Errorf("persisted move history does not match current position")
+		}
+		game.EligibleDraws = rules.EligibleDraws()
+	}
 	return game, match.Color(color), nil
 }
 
@@ -209,6 +221,15 @@ func (s *MatchStore) ApplyMove(ctx context.Context, matchID string, credentialDi
 		accepted.Promotion, accepted.Notation, accepted.PositionAfter, accepted.AcceptedAt, accepted.GivesCheck); err != nil {
 		return match.Match{}, match.Move{}, "", fmt.Errorf("insert accepted move: %w", err)
 	}
+	history, err := loadMoveHistory(ctx, tx, updated.ID)
+	if err != nil {
+		return match.Match{}, match.Move{}, "", err
+	}
+	rules, err := chess.NewGameFromMoves(history)
+	if err != nil || rules.FEN() != updated.Position {
+		return match.Match{}, match.Move{}, "", fmt.Errorf("persisted move history does not match resulting position")
+	}
+	updated.EligibleDraws = rules.EligibleDraws()
 	var result any
 	if updated.Result != "" {
 		data, marshalErr := json.Marshal(map[string]string{"outcome": updated.Result, "reason": updated.TerminationReason})
@@ -235,6 +256,31 @@ func (s *MatchStore) ApplyMove(ctx context.Context, matchID string, credentialDi
 		return match.Match{}, match.Move{}, "", fmt.Errorf("commit accepted move: %w", err)
 	}
 	return updated, accepted, seat.Color, nil
+}
+
+type moveHistoryQuerier interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}
+
+func loadMoveHistory(ctx context.Context, queryer moveHistoryQuerier, matchID string) ([]string, error) {
+	rows, err := queryer.Query(ctx, `SELECT from_square || to_square || COALESCE(promotion, '')
+		FROM moves WHERE match_id = $1 ORDER BY sequence`, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("load move history: %w", err)
+	}
+	defer rows.Close()
+	var history []string
+	for rows.Next() {
+		var move string
+		if err := rows.Scan(&move); err != nil {
+			return nil, fmt.Errorf("scan move history: %w", err)
+		}
+		history = append(history, move)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate move history: %w", err)
+	}
+	return history, nil
 }
 
 func (s *MatchStore) FindExpired(ctx context.Context, _ time.Time) ([]string, error) {
@@ -348,4 +394,203 @@ func (s *MatchStore) RecordTimeout(ctx context.Context, matchID string, _ time.T
 	first, _ := json.Marshal(clockEvent)
 	second, _ := json.Marshal(endedEvent)
 	return [][]byte{first, second}, nil
+}
+
+func (s *MatchStore) Resign(ctx context.Context, matchID string, credentialDigest []byte) (match.Match, error) {
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return match.Match{}, fmt.Errorf("begin resignation: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	game, seat, eventTime, err := s.lockMatchForSeat(ctx, tx, matchID, credentialDigest)
+	if err != nil {
+		return match.Match{}, err
+	}
+	ended, err := match.Resign(game, seat, eventTime)
+	if err != nil {
+		return match.Match{}, err
+	}
+	if err := persistMatchState(ctx, tx, ended); err != nil {
+		return match.Match{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return match.Match{}, fmt.Errorf("commit resignation: %w", err)
+	}
+	return ended, nil
+}
+
+func (s *MatchStore) CreateDrawOffer(ctx context.Context, matchID string, credentialDigest []byte, offerID string) (match.DrawOffer, error) {
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return match.DrawOffer{}, fmt.Errorf("begin draw offer: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	game, seat, eventTime, err := s.lockMatchForSeat(ctx, tx, matchID, credentialDigest)
+	if err != nil {
+		return match.DrawOffer{}, err
+	}
+	offer, err := match.CreateDrawOffer(game, seat, offerID, eventTime)
+	if err != nil {
+		return match.DrawOffer{}, err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO draw_offers (id, match_id, offering_seat_id, status, created_at)
+		VALUES ($1, $2, $3, 'pending', $4)`, offer.ID, offer.MatchID, offer.OfferingSeatID, eventTime); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "one_pending_draw_offer_per_match" {
+			return match.DrawOffer{}, match.ErrDrawOfferPending
+		}
+		return match.DrawOffer{}, fmt.Errorf("insert draw offer: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return match.DrawOffer{}, fmt.Errorf("commit draw offer: %w", err)
+	}
+	return offer, nil
+}
+
+func (s *MatchStore) ResolveDrawOffer(ctx context.Context, matchID string, credentialDigest []byte, offerID string, accept bool) (match.Match, match.DrawOffer, error) {
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return match.Match{}, match.DrawOffer{}, fmt.Errorf("begin draw resolution: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	game, seat, eventTime, err := s.lockMatchForSeat(ctx, tx, matchID, credentialDigest)
+	if err != nil {
+		return match.Match{}, match.DrawOffer{}, err
+	}
+	var offer match.DrawOffer
+	var status string
+	err = tx.QueryRow(ctx, `SELECT id, match_id, offering_seat_id, status, created_at, resolved_at
+		FROM draw_offers WHERE id = $1 AND match_id = $2 FOR UPDATE`, offerID, matchID).
+		Scan(&offer.ID, &offer.MatchID, &offer.OfferingSeatID, &status, &offer.CreatedAt, &offer.ResolvedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return match.Match{}, match.DrawOffer{}, match.ErrDrawOfferNotFound
+	}
+	if err != nil {
+		return match.Match{}, match.DrawOffer{}, fmt.Errorf("load draw offer: %w", err)
+	}
+	offer.Status = match.DrawOfferStatus(status)
+	updated, resolved, err := match.ResolveDrawOffer(game, offer, seat, accept, eventTime)
+	if err != nil {
+		return match.Match{}, match.DrawOffer{}, err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE draw_offers SET status = $2, resolved_at = $3 WHERE id = $1`, resolved.ID, resolved.Status, resolved.ResolvedAt); err != nil {
+		return match.Match{}, match.DrawOffer{}, fmt.Errorf("update draw offer: %w", err)
+	}
+	if updated.Status == match.StatusCompleted {
+		if err := persistMatchState(ctx, tx, updated); err != nil {
+			return match.Match{}, match.DrawOffer{}, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return match.Match{}, match.DrawOffer{}, fmt.Errorf("commit draw resolution: %w", err)
+	}
+	return updated, resolved, nil
+}
+
+func (s *MatchStore) ClaimDraw(ctx context.Context, matchID string, credentialDigest []byte, method string) (match.Match, error) {
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return match.Match{}, fmt.Errorf("begin draw claim: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	game, seat, eventTime, err := s.lockMatchForSeat(ctx, tx, matchID, credentialDigest)
+	if err != nil {
+		return match.Match{}, err
+	}
+	rows, err := tx.Query(ctx, `SELECT from_square || to_square || COALESCE(promotion, '')
+		FROM moves WHERE match_id = $1 ORDER BY sequence`, matchID)
+	if err != nil {
+		return match.Match{}, fmt.Errorf("load move history for draw claim: %w", err)
+	}
+	var history []string
+	for rows.Next() {
+		var move string
+		if err := rows.Scan(&move); err != nil {
+			rows.Close()
+			return match.Match{}, fmt.Errorf("scan move history: %w", err)
+		}
+		history = append(history, move)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return match.Match{}, fmt.Errorf("iterate move history: %w", err)
+	}
+	rows.Close()
+	ended, err := match.ClaimDraw(game, seat, history, method, eventTime)
+	if err != nil {
+		return match.Match{}, err
+	}
+	if err := persistMatchState(ctx, tx, ended); err != nil {
+		return match.Match{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return match.Match{}, fmt.Errorf("commit draw claim: %w", err)
+	}
+	return ended, nil
+}
+
+func (s *MatchStore) lockMatchForSeat(ctx context.Context, tx pgx.Tx, matchID string, credentialDigest []byte) (match.Match, match.PlayerSeat, time.Time, error) {
+	var game match.Match
+	var seat match.PlayerSeat
+	var status, color string
+	var activeColor pgtype.Text
+	var startedAt pgtype.Timestamptz
+	var initialMS, incrementMS, whiteMS, blackMS int64
+	var eventTime time.Time
+	err := tx.QueryRow(ctx, `SELECT m.id, m.status, m.white_player_id, m.black_player_id, m.position,
+		m.time_control, m.initial_time_ms, m.increment_ms, m.white_remaining_ms, m.black_remaining_ms,
+		m.clock_active_color, m.clock_started_at, m.version, s.id, s.color,
+		COALESCE((SELECT gives_check FROM moves WHERE match_id = m.id ORDER BY sequence DESC LIMIT 1), false)
+		FROM matches m JOIN player_seats s ON s.match_id = m.id
+		WHERE m.id = $1 AND s.recovery_credential_digest = $2 FOR UPDATE OF m`, matchID, credentialDigest).Scan(
+		&game.ID, &status, &game.WhitePlayerID, &game.BlackPlayerID, &game.Position,
+		&game.TimeControl, &initialMS, &incrementMS, &whiteMS, &blackMS,
+		&activeColor, &startedAt, &game.Version, &seat.ID, &color, &game.InCheck,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return match.Match{}, match.PlayerSeat{}, time.Time{}, match.ErrInvalidSeat
+	}
+	if err != nil {
+		return match.Match{}, match.PlayerSeat{}, time.Time{}, fmt.Errorf("lock match for seat action: %w", err)
+	}
+	if err := tx.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&eventTime); err != nil {
+		return match.Match{}, match.PlayerSeat{}, time.Time{}, fmt.Errorf("read serialized action time: %w", err)
+	}
+	game.Status = match.Status(status)
+	game.InitialTime = time.Duration(initialMS) * time.Millisecond
+	game.Increment = time.Duration(incrementMS) * time.Millisecond
+	game.WhiteRemaining = time.Duration(whiteMS) * time.Millisecond
+	game.BlackRemaining = time.Duration(blackMS) * time.Millisecond
+	game.ClockAsOf = eventTime
+	if activeColor.Valid {
+		game.ClockActiveColor = match.Color(activeColor.String)
+	}
+	if startedAt.Valid {
+		game.ClockStartedAt = &startedAt.Time
+	}
+	seat.MatchID = game.ID
+	seat.Color = match.Color(color)
+	return game, seat, eventTime, nil
+}
+
+func persistMatchState(ctx context.Context, tx pgx.Tx, game match.Match) error {
+	resultJSON, err := json.Marshal(map[string]string{"outcome": game.Result, "reason": game.TerminationReason})
+	if err != nil {
+		return fmt.Errorf("encode terminal result: %w", err)
+	}
+	var active any
+	var startedAt any
+	if game.Status == match.StatusActive {
+		active = string(game.ClockActiveColor)
+		startedAt = game.ClockStartedAt
+	}
+	if _, err := tx.Exec(ctx, `UPDATE matches SET status = $2, position = $3,
+		white_remaining_ms = $4, black_remaining_ms = $5, clock_active_color = $6,
+		clock_started_at = $7, version = $8, result = $9::jsonb, updated_at = $10
+		WHERE id = $1`, game.ID, game.Status, game.Position,
+		game.WhiteRemaining.Milliseconds(), game.BlackRemaining.Milliseconds(), active,
+		startedAt, game.Version, string(resultJSON), game.ClockAsOf); err != nil {
+		return fmt.Errorf("persist terminal match: %w", err)
+	}
+	return nil
 }

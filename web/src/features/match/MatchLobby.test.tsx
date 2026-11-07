@@ -6,6 +6,7 @@ import { App } from "../../App";
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  window.sessionStorage.clear();
   window.history.replaceState(null, "", "/");
 });
 

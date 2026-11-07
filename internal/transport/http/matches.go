@@ -27,6 +27,11 @@ type joinRequest struct {
 	InviteToken string `json:"invite_token"`
 }
 
+type recoveryRequest struct {
+	RecoveryCredential string `json:"recovery_credential"`
+	KnownVersion       *int64 `json:"known_version,omitempty"`
+}
+
 type moveRequest struct {
 	ExpectedVersion int64  `json:"expected_version"`
 	From            string `json:"from"`
@@ -51,6 +56,7 @@ type matchResponse struct {
 	Version            int64         `json:"version"`
 	TimeControl        string        `json:"time_control"`
 	InCheck            bool          `json:"in_check"`
+	EligibleDraws      []string      `json:"eligible_draws"`
 	Clock              clockResponse `json:"clock"`
 }
 
@@ -65,12 +71,21 @@ type moveResponse struct {
 		Notation  string `json:"notation"`
 		Check     bool   `json:"check"`
 	} `json:"move"`
-	Position string        `json:"position"`
-	NextTurn string        `json:"next_turn"`
-	Version  int64         `json:"version"`
-	InCheck  bool          `json:"in_check"`
-	Clock    clockResponse `json:"clock"`
-	Result   string        `json:"result,omitempty"`
+	Position      string        `json:"position"`
+	NextTurn      string        `json:"next_turn"`
+	Version       int64         `json:"version"`
+	InCheck       bool          `json:"in_check"`
+	EligibleDraws []string      `json:"eligible_draws"`
+	Clock         clockResponse `json:"clock"`
+	Result        string        `json:"result,omitempty"`
+}
+
+type drawDecisionRequest struct {
+	Decision string `json:"decision"`
+}
+
+type drawClaimRequest struct {
+	Method string `json:"method"`
 }
 
 func (e matchEndpoints) create(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +137,7 @@ func (e matchEndpoints) join(w http.ResponseWriter, r *http.Request) {
 	response := matchResponse{
 		MatchID: joined.Match.ID, Status: string(joined.Match.Status), Color: string(joined.Seat.Color),
 		Position: joined.Match.Position, RecoveryCredential: joined.RecoveryCredential,
-		Version: joined.Match.Version, TimeControl: joined.Match.TimeControl,
+		Version: joined.Match.Version, TimeControl: joined.Match.TimeControl, EligibleDraws: joined.Match.EligibleDraws,
 		Clock: clockResponse{
 			WhiteRemainingMS: joined.Match.WhiteRemaining.Milliseconds(),
 			BlackRemainingMS: joined.Match.BlackRemaining.Milliseconds(),
@@ -160,7 +175,8 @@ func (e matchEndpoints) get(w http.ResponseWriter, r *http.Request) {
 	response := matchResponse{
 		MatchID: state.Match.ID, Status: string(state.Match.Status), Color: string(state.Seat.Color),
 		Position: state.Match.Position, Version: state.Match.Version, TimeControl: state.Match.TimeControl,
-		InCheck: state.Match.InCheck,
+		InCheck:       state.Match.InCheck,
+		EligibleDraws: state.Match.EligibleDraws,
 		Clock: clockResponse{
 			WhiteRemainingMS: state.Match.WhiteRemaining.Milliseconds(),
 			BlackRemainingMS: state.Match.BlackRemaining.Milliseconds(),
@@ -169,6 +185,16 @@ func (e matchEndpoints) get(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	writeJSON(w, http.StatusOK, response)
+}
+
+func (e matchEndpoints) recover(w http.ResponseWriter, r *http.Request) {
+	var body recoveryRequest
+	if err := decodeJSON(w, r, &body); err != nil || body.RecoveryCredential == "" {
+		writeError(w, http.StatusBadRequest, "invalid_request", "recovery_credential is required")
+		return
+	}
+	r.Header.Set("Authorization", "Bearer "+body.RecoveryCredential)
+	e.get(w, r)
 }
 
 func (e matchEndpoints) move(w http.ResponseWriter, r *http.Request) {
@@ -224,7 +250,7 @@ func (e matchEndpoints) applyMove(ctx context.Context, matchID, credential strin
 	}
 	activeColor := nextTurn
 	response := moveResponse{
-		Type: "move_accepted", Position: game.Position, NextTurn: nextTurn, Version: game.Version, InCheck: game.InCheck,
+		Type: "move_accepted", Position: game.Position, NextTurn: nextTurn, Version: game.Version, InCheck: game.InCheck, EligibleDraws: game.EligibleDraws,
 		Clock: clockResponse{
 			WhiteRemainingMS: game.WhiteRemaining.Milliseconds(),
 			BlackRemainingMS: game.BlackRemaining.Milliseconds(),
@@ -295,22 +321,23 @@ func (e matchEndpoints) snapshot(ctx context.Context, matchID, credential string
 		asOf = time.Now().UTC()
 	}
 	response := struct {
-		Type        string        `json:"type"`
-		MatchID     string        `json:"match_id"`
-		Status      string        `json:"status"`
-		Color       string        `json:"color"`
-		Position    string        `json:"position"`
-		NextTurn    string        `json:"next_turn"`
-		Version     int64         `json:"version"`
-		TimeControl string        `json:"time_control"`
-		InCheck     bool          `json:"in_check"`
-		Clock       clockResponse `json:"clock"`
-		Result      string        `json:"result,omitempty"`
+		Type          string        `json:"type"`
+		MatchID       string        `json:"match_id"`
+		Status        string        `json:"status"`
+		Color         string        `json:"color"`
+		Position      string        `json:"position"`
+		NextTurn      string        `json:"next_turn"`
+		Version       int64         `json:"version"`
+		TimeControl   string        `json:"time_control"`
+		InCheck       bool          `json:"in_check"`
+		EligibleDraws []string      `json:"eligible_draws"`
+		Clock         clockResponse `json:"clock"`
+		Result        string        `json:"result,omitempty"`
 	}{
 		Type: "match_snapshot", MatchID: state.Match.ID, Status: string(state.Match.Status),
 		Color: string(state.Seat.Color), Position: state.Match.Position,
 		NextTurn: turnFromPosition(state.Match.Position), Version: state.Match.Version,
-		TimeControl: state.Match.TimeControl, InCheck: state.Match.InCheck, Result: state.Match.Result,
+		TimeControl: state.Match.TimeControl, InCheck: state.Match.InCheck, EligibleDraws: state.Match.EligibleDraws, Result: state.Match.Result,
 		Clock: clockResponse{
 			WhiteRemainingMS: state.Match.WhiteRemaining.Milliseconds(),
 			BlackRemainingMS: state.Match.BlackRemaining.Milliseconds(),
@@ -318,6 +345,155 @@ func (e matchEndpoints) snapshot(ctx context.Context, matchID, credential string
 		},
 	}
 	return json.Marshal(response)
+}
+
+func (e matchEndpoints) resign(w http.ResponseWriter, r *http.Request) {
+	credential, ok := bearerCredential(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "seat authorization is required")
+		return
+	}
+	game, err := e.service.Resign(r.Context(), r.PathValue("match_id"), credential)
+	if status, code, message, handled := terminationError(err); handled {
+		writeError(w, status, code, message)
+		return
+	}
+	response := terminalResponse(game)
+	e.publishTerminal(game, response)
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (e matchEndpoints) offerDraw(w http.ResponseWriter, r *http.Request) {
+	credential, ok := bearerCredential(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "seat authorization is required")
+		return
+	}
+	seat, err := e.service.Read(r.Context(), r.PathValue("match_id"), credential)
+	if err != nil {
+		if status, code, message, handled := terminationError(err); handled {
+			writeError(w, status, code, message)
+			return
+		}
+	}
+	offer, err := e.service.OfferDraw(r.Context(), r.PathValue("match_id"), credential)
+	if status, code, message, handled := terminationError(err); handled {
+		writeError(w, status, code, message)
+		return
+	}
+	response := map[string]any{"offer_id": offer.ID, "status": offer.Status, "offering_color": seat.Seat.Color}
+	if e.hub != nil {
+		if event, marshalErr := json.Marshal(map[string]any{"type": "draw_offer", "offer_id": offer.ID, "offering_seat_id": offer.OfferingSeatID, "offering_color": seat.Seat.Color, "status": offer.Status}); marshalErr == nil {
+			e.hub.Publish(offer.MatchID, event)
+		}
+	}
+	writeJSON(w, http.StatusCreated, response)
+}
+
+func (e matchEndpoints) resolveDraw(w http.ResponseWriter, r *http.Request) {
+	credential, ok := bearerCredential(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "seat authorization is required")
+		return
+	}
+	var body drawDecisionRequest
+	if err := decodeJSON(w, r, &body); err != nil || (body.Decision != "accept" && body.Decision != "decline") {
+		writeError(w, http.StatusBadRequest, "invalid_request", "decision must be accept or decline")
+		return
+	}
+	game, offer, err := e.service.ResolveDrawOffer(r.Context(), r.PathValue("match_id"), credential, r.PathValue("offer_id"), body.Decision == "accept")
+	if status, code, message, handled := terminationError(err); handled {
+		writeError(w, status, code, message)
+		return
+	}
+	response := map[string]any{"offer_id": offer.ID, "status": offer.Status, "match_id": game.ID, "match_status": game.Status, "result": game.Result}
+	if e.hub != nil {
+		if event, marshalErr := json.Marshal(map[string]any{"type": "draw_resolved", "offer_id": offer.ID, "status": offer.Status, "version": game.Version}); marshalErr == nil {
+			e.hub.Publish(game.ID, event)
+		}
+		if game.Status == match.StatusCompleted {
+			e.publishTerminal(game, terminalResponse(game))
+		}
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (e matchEndpoints) claimDraw(w http.ResponseWriter, r *http.Request) {
+	credential, ok := bearerCredential(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "seat authorization is required")
+		return
+	}
+	var body drawClaimRequest
+	if err := decodeJSON(w, r, &body); err != nil || body.Method == "" {
+		writeError(w, http.StatusBadRequest, "invalid_request", "method is required")
+		return
+	}
+	game, err := e.service.ClaimDraw(r.Context(), r.PathValue("match_id"), credential, body.Method)
+	if status, code, message, handled := terminationError(err); handled {
+		writeError(w, status, code, message)
+		return
+	}
+	response := terminalResponse(game)
+	e.publishTerminal(game, response)
+	writeJSON(w, http.StatusOK, response)
+}
+
+func bearerCredential(r *http.Request) (string, bool) {
+	parts := strings.Fields(r.Header.Get("Authorization"))
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return "", false
+	}
+	return parts[1], true
+}
+
+func terminationError(err error) (int, string, string, bool) {
+	switch {
+	case err == nil:
+		return 0, "", "", false
+	case errors.Is(err, match.ErrInvalidSeat):
+		return http.StatusUnauthorized, "unauthorized", "seat authorization is invalid", true
+	case errors.Is(err, match.ErrDrawOfferNotFound):
+		return http.StatusNotFound, "draw_offer_not_found", "draw offer not found", true
+	case errors.Is(err, match.ErrDrawOfferPending):
+		return http.StatusConflict, "draw_offer_pending", "a draw offer is already pending", true
+	case errors.Is(err, match.ErrMatchUnavailable):
+		return http.StatusConflict, "match_unavailable", "match is not active", true
+	case errors.Is(err, match.ErrFlagFell):
+		return http.StatusConflict, "clock_expired", "the active clock has expired", true
+	case errors.Is(err, match.ErrWrongTurn), errors.Is(err, match.ErrDrawNotClaimable):
+		return http.StatusUnprocessableEntity, "draw_action_rejected", err.Error(), true
+	default:
+		return http.StatusInternalServerError, "termination_failed", "could not complete match action", true
+	}
+}
+
+func terminalResponse(game match.Match) map[string]any {
+	return map[string]any{
+		"match_id": game.ID, "status": game.Status, "result": game.Result,
+		"reason": game.TerminationReason, "position": game.Position,
+		"version": game.Version, "in_check": game.InCheck,
+		"clock": map[string]any{
+			"white_remaining_ms": game.WhiteRemaining.Milliseconds(),
+			"black_remaining_ms": game.BlackRemaining.Milliseconds(),
+			"active_color":       nil,
+			"as_of":              game.ClockAsOf.UTC().Format(time.RFC3339Nano),
+		},
+	}
+}
+
+func (e matchEndpoints) publishTerminal(game match.Match, response map[string]any) {
+	if e.hub == nil {
+		return
+	}
+	event := make(map[string]any, len(response)+1)
+	for key, value := range response {
+		event[key] = value
+	}
+	event["type"] = "game_ended"
+	if data, err := json.Marshal(event); err == nil {
+		e.hub.Publish(game.ID, data)
+	}
 }
 
 func turnFromPosition(position string) string {

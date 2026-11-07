@@ -88,6 +88,20 @@ func NewSessionHandler(options SessionOptions) http.Handler {
 		if err := conn.Write(r.Context(), websocket.MessageText, snapshot); err != nil {
 			return
 		}
+		var snapshotIdentity struct {
+			Color string `json:"color"`
+		}
+		_ = json.Unmarshal(snapshot, &snapshotIdentity)
+		publishPresence := func(connected bool) {
+			event, err := json.Marshal(map[string]any{
+				"type": "opponent_connection", "color": snapshotIdentity.Color, "connected": connected,
+			})
+			if err == nil {
+				options.Hub.Publish(matchID, event)
+			}
+		}
+		publishPresence(true)
+		defer publishPresence(false)
 		type incomingMessage struct {
 			data []byte
 			err  error

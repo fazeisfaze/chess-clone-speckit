@@ -68,7 +68,7 @@ anchor; a reconnect never resets or pauses the active clock.
 Requires seat authorization. Returns match status, caller's color, current position, turn,
 version, result, and move history. A waiting match may be read by its creator seat only.
 The response includes a clock snapshot with remaining times, active color, time control, and
-server `as_of` timestamp.
+server `as_of` timestamp, current check status, and currently claimable draw methods.
 
 ## Submit a move
 
@@ -86,7 +86,7 @@ Requires seat authorization.
 ```
 
 Success returns the accepted move, resulting position, next turn, version, check status,
-updated clock snapshot, and game result if terminal. Invalid/illegal/out-of-turn moves return `422`; stale
+claimable draw methods, updated clock snapshot, and game result if terminal. Invalid/illegal/out-of-turn moves return `422`; stale
 versions return `409`. The server determines move-vs-timeout order after serializing the
 command for the match; client timestamps are ignored.
 Neither error may change match state. A successful move is persisted before success is

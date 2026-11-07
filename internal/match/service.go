@@ -20,6 +20,8 @@ var (
 	ErrWrongTurn          = errors.New("it is not this player's turn")
 	ErrIllegalMove        = errors.New("move is illegal")
 	ErrFlagFell           = clock.ErrFlagFell
+	ErrDrawOfferNotFound  = errors.New("draw offer not found")
+	ErrDrawOfferPending   = errors.New("a draw offer is already pending")
 )
 
 type Store interface {
@@ -27,6 +29,10 @@ type Store interface {
 	Join(context.Context, string, PlayerSeat) (Match, error)
 	ReadForSeat(context.Context, string, []byte) (Match, Color, error)
 	ApplyMove(context.Context, string, []byte, int64, string, string, string) (Match, Move, Color, error)
+	Resign(context.Context, string, []byte) (Match, error)
+	CreateDrawOffer(context.Context, string, []byte, string) (DrawOffer, error)
+	ResolveDrawOffer(context.Context, string, []byte, string, bool) (Match, DrawOffer, error)
+	ClaimDraw(context.Context, string, []byte, string) (Match, error)
 }
 
 type Service struct {
@@ -118,6 +124,38 @@ func (s *Service) ApplyMove(ctx context.Context, matchID, recoveryCredential str
 		return Match{}, Move{}, "", ErrInvalidSeat
 	}
 	return s.store.ApplyMove(ctx, matchID, digestBytes(recoveryCredential), expectedVersion, from, to, promotion)
+}
+
+func (s *Service) Resign(ctx context.Context, matchID, recoveryCredential string) (Match, error) {
+	if matchID == "" || recoveryCredential == "" {
+		return Match{}, ErrInvalidSeat
+	}
+	return s.store.Resign(ctx, matchID, digestBytes(recoveryCredential))
+}
+
+func (s *Service) OfferDraw(ctx context.Context, matchID, recoveryCredential string) (DrawOffer, error) {
+	if matchID == "" || recoveryCredential == "" {
+		return DrawOffer{}, ErrInvalidSeat
+	}
+	offerID, err := randomToken(18)
+	if err != nil {
+		return DrawOffer{}, fmt.Errorf("generate draw offer ID: %w", err)
+	}
+	return s.store.CreateDrawOffer(ctx, matchID, digestBytes(recoveryCredential), offerID)
+}
+
+func (s *Service) ResolveDrawOffer(ctx context.Context, matchID, recoveryCredential, offerID string, accept bool) (Match, DrawOffer, error) {
+	if matchID == "" || recoveryCredential == "" || offerID == "" {
+		return Match{}, DrawOffer{}, ErrInvalidSeat
+	}
+	return s.store.ResolveDrawOffer(ctx, matchID, digestBytes(recoveryCredential), offerID, accept)
+}
+
+func (s *Service) ClaimDraw(ctx context.Context, matchID, recoveryCredential, method string) (Match, error) {
+	if matchID == "" || recoveryCredential == "" {
+		return Match{}, ErrInvalidSeat
+	}
+	return s.store.ClaimDraw(ctx, matchID, digestBytes(recoveryCredential), method)
 }
 
 func randomToken(size int) (string, error) {

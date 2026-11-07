@@ -91,6 +91,10 @@ func TestMoveEndpointAcceptsLegalMoveAndRejectsIllegalOrStaleMove(t *testing.T) 
 	if snapshot["type"] != "match_snapshot" {
 		t.Fatalf("first realtime message = %v, want match_snapshot", snapshot)
 	}
+	var connectionEvent map[string]any
+	if err := wsjson.Read(wsContext, ws, &connectionEvent); err != nil || connectionEvent["type"] != "opponent_connection" {
+		t.Fatalf("initial presence event = %v, error = %v", connectionEvent, err)
+	}
 
 	submit := func(credential string, version int64, from, to string) (*http.Response, error) {
 		body, _ := json.Marshal(map[string]any{"expected_version": version, "from": from, "to": to, "promotion": nil})

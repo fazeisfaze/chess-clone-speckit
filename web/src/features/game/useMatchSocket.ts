@@ -13,8 +13,12 @@ function initialState(match: MatchResponse): MatchState {
     version: match.version,
     timeControl: match.time_control,
     inCheck: match.in_check ?? false,
+    eligibleDraws: match.eligible_draws ?? [],
     clock: { ...match.clock, client_received_at: Date.now() },
     result: "",
+    drawOffer: null,
+    notice: "",
+    opponentConnected: false,
     error: "",
     syncRequired: false,
   };
@@ -69,6 +73,7 @@ export function useMatchSocket(match: MatchResponse, recoveryCredential: string)
           version: snapshot.version,
           time_control: snapshot.time_control,
           in_check: snapshot.in_check ?? false,
+          eligible_draws: snapshot.eligible_draws ?? [],
           clock: snapshot.clock,
         });
       }

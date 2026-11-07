@@ -14,7 +14,8 @@ body { margin: 0; min-width: 320px; min-height: 100vh; }
 button, select { border: 1px solid #49616f; border-radius: .5rem; padding: .65rem .9rem; font: inherit; }
 button { color: #fff; background: #26734d; cursor: pointer; }
 .clocks { display: flex; gap: 1rem; font-variant-numeric: tabular-nums; }
-.chess-board { display: grid; grid-template-columns: repeat(8, minmax(2rem, 4.5rem)); width: min(90vw, 36rem); aspect-ratio: 1; }
-.board-square { display: grid; place-items: center; font-size: clamp(1.4rem, 6vw, 3rem); }
+.chess-board { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: repeat(8, minmax(0, 1fr)); width: min(90vw, 36rem); aspect-ratio: 1; }
+.board-square { display: grid; place-items: center; min-width: 0; min-height: 0; padding: 0; border: 0; border-radius: 0; font-size: clamp(1.4rem, 6vw, 3rem); }
+.board-square.selected { outline: 3px solid #e3b341; outline-offset: -3px; }
 .board-square.light { color: #222; background: #e8edf0; }
 .board-square.dark { color: #fff; background: #557b68; }

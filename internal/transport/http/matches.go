@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -102,7 +103,7 @@ func (e matchEndpoints) create(w http.ResponseWriter, r *http.Request) {
 	response := matchResponse{
 		MatchID: created.Match.ID, Status: string(created.Match.Status), Color: string(created.Seat.Color),
 		Position:           created.Match.Position,
-		InviteURL:          strings.TrimRight(e.origin, "/") + "/join#token=" + created.InviteToken,
+		InviteURL:          strings.TrimRight(inviteOrigin(r, e.origin), "/") + "/join#token=" + created.InviteToken,
 		RecoveryCredential: created.RecoveryCredential, Version: created.Match.Version,
 		TimeControl: created.Match.TimeControl,
 		Clock: clockResponse{
@@ -112,6 +113,28 @@ func (e matchEndpoints) create(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	writeJSON(w, http.StatusCreated, response)
+}
+
+func inviteOrigin(r *http.Request, configured string) string {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return configured
+	}
+	if origin == configured {
+		return origin
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.Path != "" {
+		return configured
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if parsed.Scheme == scheme && strings.EqualFold(parsed.Host, r.Host) {
+		return origin
+	}
+	return configured
 }
 
 func (e matchEndpoints) join(w http.ResponseWriter, r *http.Request) {

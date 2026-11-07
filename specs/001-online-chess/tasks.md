@@ -158,14 +158,14 @@ match ending is consistent for both players.
 
 **Purpose**: Verify accessibility, security, and all acceptance criteria across stories.
 
-- [ ] T054 [P] Add security regression tests for invitation/recovery credential redaction, WebSocket origin validation, rate limits, and unauthenticated state disclosure in `tests/security/session_security_test.go`.
-- [ ] T055 Harden credential handling, request limits, and WebSocket error behavior in `internal/transport/http/security.go` and `internal/transport/realtime/session.go`; make `tests/security/session_security_test.go` pass.
-- [ ] T056 [P] Add keyboard and screen-reader interaction tests for the chess grid and live status announcements in `web/src/features/game/accessibility.test.tsx`.
-- [ ] T057 Implement keyboard-operable square selection and accessible turn, error, and clock announcements in `web/src/features/game/GameBoard.tsx` and `web/src/features/game/ClockDisplay.tsx`; make `web/src/features/game/accessibility.test.tsx` pass.
-- [ ] T058 [P] Add and run acceptance-metric checks for SC-001, SC-002, SC-004, and SC-006 in `tests/acceptance/metrics_test.go` and `web/e2e/acceptance-metrics.spec.ts`; assert at least 19/20 joins within 60 seconds, at least 396/400 move updates within 2 seconds, at least 19/20 reconnect trials initiated within 5 minutes restore the latest position and clock state, and all 20 clock displays stay within 1 second with identical timeout results.
+- [X] T054 [P] Add security regression tests for invitation/recovery credential redaction, WebSocket origin validation, rate limits, and unauthenticated state disclosure in `tests/security/session_security_test.go` and `internal/transport/realtime/session_test.go`.
+- [X] T055 Harden credential handling, request limits, and WebSocket error behavior in `internal/transport/http/ratelimit.go`, `internal/transport/http/matches.go`, and `internal/transport/realtime/session.go`; make security tests pass.
+- [X] T056 [P] Add keyboard and screen-reader interaction tests for the chess grid and live status announcements in `web/src/features/game/accessibility.test.tsx`.
+- [X] T057 Implement keyboard-operable square selection and accessible turn, check, error, and clock announcements in `web/src/features/game/GameBoard.tsx`, `web/src/features/game/GameView.tsx`, and `web/src/features/game/ClockDisplay.tsx`; make accessibility tests pass.
+- [X] T058 [P] Add and run acceptance-metric checks for SC-001, SC-002, SC-004, and SC-006 in `tests/acceptance/metrics_test.go` and `web/e2e/acceptance-metrics.spec.ts`; assert at least 19/20 joins within 60 seconds, at least 396/400 move updates within 2 seconds, at least 19/20 reconnect trials initiated within 5 minutes restore the latest position and clock state, and all 20 clock displays stay within 1 second with identical timeout results.
 - [ ] T059 [P] Create and execute a first-use usability protocol with 10 participants, recording whether at least 9 can start a match, make a legal move, and identify the next turn without help in `specs/001-online-chess/usability-validation.md`.
-- [ ] T060 Run Go tests, frontend tests, browser end-to-end tests, and formatting checks; record results in `specs/001-online-chess/quickstart.md` and RED/GREEN/regression evidence in `specs/001-online-chess/test-evidence.md`.
-- [ ] T061 Validate all documented local setup and two-player timed-match scenarios in `specs/001-online-chess/quickstart.md` and fix any discrepancies in the referenced files.
+- [X] T060 Run Go tests, frontend tests, browser end-to-end tests, and formatting checks; record results in `specs/001-online-chess/quickstart.md` and RED/GREEN/regression evidence in `specs/001-online-chess/test-evidence.md`.
+- [X] T061 Validate all documented local setup and two-player timed-match scenarios in `specs/001-online-chess/quickstart.md` and fix any discrepancies in the referenced files.
 
 ---
 

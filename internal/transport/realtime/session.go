@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -30,7 +31,7 @@ func NewSessionHandler(options SessionOptions) http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if origin == "" || origin != options.AllowedOrigin {
+		if origin == "" || (origin != options.AllowedOrigin && !isSameOrigin(r, origin)) {
 			http.Error(w, "origin not allowed", http.StatusForbidden)
 			return
 		}
@@ -147,4 +148,16 @@ func NewSessionHandler(options SessionOptions) http.Handler {
 			}
 		}
 	})
+}
+
+func isSameOrigin(r *http.Request, origin string) bool {
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Host == "" || parsed.User != nil || (parsed.Path != "" && parsed.Path != "/") {
+		return false
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	return parsed.Scheme == scheme && strings.EqualFold(parsed.Host, r.Host)
 }

@@ -29,6 +29,7 @@ func TestHTTPServerServesBuiltReactEntryAndAssets(t *testing.T) {
 
 	for path, want := range map[string]string{
 		"/":              "<main>Online Chess</main>",
+		"/join":          "<main>Online Chess</main>",
 		"/assets/app.js": "window.chess = true",
 	} {
 		response, err := http.Get(server.URL + path)

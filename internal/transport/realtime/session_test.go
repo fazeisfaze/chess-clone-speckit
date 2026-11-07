@@ -98,6 +98,23 @@ func TestSessionRequiresAuthenticationBeforeSendingData(t *testing.T) {
 	}
 }
 
+func TestSessionAllowsSameOriginWhenGoServesTheFrontend(t *testing.T) {
+	server := sessionTestServer(NewSessionHandler(SessionOptions{
+		AllowedOrigin:         "http://localhost:5173",
+		AuthenticationTimeout: time.Second,
+		Authorize:             func(context.Context, string, string) bool { return true },
+	}))
+	defer server.Close()
+	conn, ctx := dialTestSocket(t, server, server.URL)
+	if err := wsjson.Write(ctx, conn, map[string]string{"type": "authenticate", "recovery_credential": "seat-secret"}); err != nil {
+		t.Fatalf("authenticate same-origin socket: %v", err)
+	}
+	var authenticated map[string]string
+	if err := wsjson.Read(ctx, conn, &authenticated); err != nil || authenticated["type"] != "authenticated" {
+		t.Fatalf("same-origin session response = %v, error = %v", authenticated, err)
+	}
+}
+
 func TestSessionClosesWhenAuthenticationTimesOut(t *testing.T) {
 	server := sessionTestServer(NewSessionHandler(SessionOptions{
 		AllowedOrigin:         "http://allowed.test",

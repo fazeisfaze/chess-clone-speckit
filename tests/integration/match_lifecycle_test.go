@@ -43,7 +43,10 @@ func TestMatchLifecycleCreatesJoinsAndRejectsThirdPlayer(t *testing.T) {
 	defer server.Close()
 
 	createBody, _ := json.Marshal(map[string]string{"time_control": "5+0"})
-	createResponse, err := http.Post(server.URL+"/matches", "application/json", bytes.NewReader(createBody))
+	createRequest, _ := http.NewRequest(http.MethodPost, server.URL+"/matches", bytes.NewReader(createBody))
+	createRequest.Header.Set("Content-Type", "application/json")
+	createRequest.Header.Set("Origin", server.URL)
+	createResponse, err := http.DefaultClient.Do(createRequest)
 	if err != nil {
 		t.Fatalf("create match: %v", err)
 	}
@@ -67,6 +70,9 @@ func TestMatchLifecycleCreatesJoinsAndRejectsThirdPlayer(t *testing.T) {
 	}
 	if created.Credential == "" {
 		t.Fatal("host did not receive a seat recovery credential")
+	}
+	if !strings.HasPrefix(created.InviteURL, server.URL+"/") {
+		t.Fatalf("invitation URL = %q; expected it to stay on the server-served web origin %q", created.InviteURL, server.URL)
 	}
 	inviteURL, err := url.Parse(created.InviteURL)
 	if err != nil {

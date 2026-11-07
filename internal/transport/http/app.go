@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"chess_clone/internal/config"
 	"chess_clone/internal/match"
@@ -43,7 +44,8 @@ func NewApplication(cfg config.Config, pool *pgxpool.Pool) *Application {
 		OnMessage: endpoints.socketMessage,
 	}))
 	mux.Handle("/", NewHandler(cfg))
-	return &Application{Handler: mux, Hub: hub, MatchStore: store}
+	limiter := NewRateLimiter(1200, time.Minute, time.Now)
+	return &Application{Handler: limiter.Middleware(mux), Hub: hub, MatchStore: store}
 }
 
 func NewApplicationHandler(cfg config.Config, pool *pgxpool.Pool) http.Handler {

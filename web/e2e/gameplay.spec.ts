@@ -13,6 +13,19 @@ test("two players see accepted moves, turns, and clocks converge", async ({ brow
   if (!invitation) throw new Error("invitation link missing");
   await guest.goto(invitation);
   await guest.getByRole("button", { name: "Join match" }).click();
+  await expect(host.getByText("Connected", { exact: true })).toBeVisible();
+  await expect(guest.getByText("Connected", { exact: true })).toBeVisible();
+
+  const squareRects = await host.getByRole("gridcell").evaluateAll((cells) =>
+    cells.map((cell) => {
+      const rect = cell.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    }),
+  );
+  expect(squareRects).toHaveLength(64);
+  for (const square of squareRects) {
+    expect(Math.abs(square.width - square.height)).toBeLessThan(1);
+  }
 
   const whitePawn = host.getByRole("gridcell", { name: /e2.*white pawn/i });
   await whitePawn.click();

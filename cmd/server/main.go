@@ -2,9 +2,8 @@ package main
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -18,24 +17,34 @@ import (
 )
 
 func main() {
+	if err := run(os.Args[1:]); err != nil {
+		slog.Error("server exited", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run(args []string) error {
+	migrateOnly, err := parseArgs(args)
+	if err != nil {
+		return err
+	}
 	cfg, err := config.Load()
 	if err != nil {
-		slog.Error("load configuration", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("load configuration: %w", err)
 	}
 	pool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
 	if err != nil {
-		slog.Error("connect to database", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("connect to database: %w", err)
 	}
 	defer pool.Close()
 	if err := pool.Ping(context.Background()); err != nil {
-		slog.Error("ping database", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("ping database: %w", err)
 	}
 	if err := postgres.ApplyMigrations(context.Background(), pool, "migrations"); err != nil {
-		slog.Error("apply database migrations", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("apply database migrations: %w", err)
+	}
+	if migrateOnly {
+		return nil
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -47,8 +56,5 @@ func main() {
 		}
 	}()
 	server := httpapi.NewServer(cfg, app.Handler)
-	if err := httpapi.Serve(ctx, server); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		slog.Error("http server stopped", "error", err)
-		os.Exit(1)
-	}
+	return httpapi.Serve(ctx, server)
 }

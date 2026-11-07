@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { ClockDisplay, type ClockView } from "./ClockDisplay";
 
 export type GameBoardProps = {
@@ -75,6 +75,20 @@ export function GameBoard({ position, currentTurn, viewColor, inCheck, clock, on
     onMove(from, square);
   }
 
+  function moveGridFocus(event: KeyboardEvent<HTMLButtonElement>) {
+    const deltas: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 8, ArrowUp: -8 };
+    const delta = deltas[event.key];
+    if (delta === undefined) return;
+    const grid = event.currentTarget.parentElement;
+    const cells = grid ? Array.from(grid.querySelectorAll<HTMLButtonElement>('[role="gridcell"]')) : [];
+    const currentIndex = cells.indexOf(event.currentTarget);
+    const nextIndex = currentIndex + delta;
+    if (nextIndex < 0 || nextIndex >= cells.length) return;
+    if ((event.key === "ArrowRight" || event.key === "ArrowLeft") && Math.floor(currentIndex / 8) !== Math.floor(nextIndex / 8)) return;
+    event.preventDefault();
+    cells[nextIndex]?.focus();
+  }
+
   return (
     <section className="game-board-panel" aria-label="Chess game">
       <p className="turn-status" aria-live="polite">{currentTurn === "white" ? "White" : "Black"} to move</p>
@@ -96,6 +110,7 @@ export function GameBoard({ position, currentTurn, viewColor, inCheck, clock, on
                 aria-selected={selected === square}
                 key={square}
                 onClick={() => chooseSquare(square)}
+                onKeyDown={moveGridFocus}
               >
                 {piece?.glyph ?? ""}
               </button>

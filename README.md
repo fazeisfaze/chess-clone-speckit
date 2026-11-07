@@ -9,8 +9,7 @@ A two-player online chess app with invitation links, server-authoritative legal 
 clocks, reconnect/recovery, draw and resign actions, move history, and latest-move
 highlighting. The Go server serves the React app and its HTTP/WebSocket API from one origin.
 
-For the project and Spec-Kit learning summary, see
-[`SPEC_KIT_PROJECT_JOURNEY.md`](SPEC_KIT_PROJECT_JOURNEY.md).
+
 
 ## Run with Docker Compose (recommended)
 

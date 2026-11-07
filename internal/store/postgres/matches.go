@@ -107,13 +107,13 @@ func (s *MatchStore) Join(ctx context.Context, inviteDigest string, black match.
 	return active, nil
 }
 
-func (s *MatchStore) ReadForSeat(ctx context.Context, matchID string, credentialDigest []byte) (match.Match, match.Color, error) {
+func (s *MatchStore) ReadForSeat(ctx context.Context, matchID string, credentialDigest []byte) (match.Match, match.Color, []match.Move, error) {
 	var game match.Match
 	var color, status string
 	var activeColor pgtype.Text
 	var startedAt pgtype.Timestamptz
 	var initialMS, incrementMS, whiteMS, blackMS int64
-	err := s.Pool.QueryRow(ctx, `SELECT m.id, m.status, m.white_player_id, m.black_player_id,
+	err := s.Pool.QueryRow(ctx, `SELECT m.id, m.status, m.white_player_id, COALESCE(m.black_player_id, ''),
 		m.position, m.time_control, m.initial_time_ms, m.increment_ms,
 		CASE WHEN m.clock_active_color = 'white' THEN GREATEST(m.white_remaining_ms -
 			FLOOR(EXTRACT(EPOCH FROM (instant.value - m.clock_started_at)) * 1000)::bigint, 0)
@@ -132,10 +132,10 @@ func (s *MatchStore) ReadForSeat(ctx context.Context, matchID string, credential
 		&activeColor, &startedAt, &game.ClockAsOf, &game.Version, &color, &game.InCheck,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return match.Match{}, "", match.ErrInvalidSeat
+		return match.Match{}, "", nil, match.ErrInvalidSeat
 	}
 	if err != nil {
-		return match.Match{}, "", fmt.Errorf("read match for seat: %w", err)
+		return match.Match{}, "", nil, fmt.Errorf("read match for seat: %w", err)
 	}
 	game.Status = match.Status(status)
 	game.InitialTime = time.Duration(initialMS) * time.Millisecond
@@ -148,18 +148,25 @@ func (s *MatchStore) ReadForSeat(ctx context.Context, matchID string, credential
 	if startedAt.Valid {
 		game.ClockStartedAt = &startedAt.Time
 	}
+	var acceptedMoves []match.Move
+	if game.Status == match.StatusActive || game.Status == match.StatusCompleted {
+		acceptedMoves, err = loadAcceptedMoves(ctx, s.Pool, game.ID)
+		if err != nil {
+			return match.Match{}, "", nil, err
+		}
+	}
 	if game.Status == match.StatusActive {
 		history, err := loadMoveHistory(ctx, s.Pool, game.ID)
 		if err != nil {
-			return match.Match{}, "", err
+			return match.Match{}, "", nil, err
 		}
 		rules, err := chess.NewGameFromMoves(history)
 		if err != nil || rules.FEN() != game.Position {
-			return match.Match{}, "", fmt.Errorf("persisted move history does not match current position")
+			return match.Match{}, "", nil, fmt.Errorf("persisted move history does not match current position")
 		}
 		game.EligibleDraws = rules.EligibleDraws()
 	}
-	return game, match.Color(color), nil
+	return game, match.Color(color), acceptedMoves, nil
 }
 
 func (s *MatchStore) ApplyMove(ctx context.Context, matchID string, credentialDigest []byte, expectedVersion int64, from, to, promotion string) (match.Match, match.Move, match.Color, error) {
@@ -281,6 +288,33 @@ func loadMoveHistory(ctx context.Context, queryer moveHistoryQuerier, matchID st
 		return nil, fmt.Errorf("iterate move history: %w", err)
 	}
 	return history, nil
+}
+
+func loadAcceptedMoves(ctx context.Context, queryer moveHistoryQuerier, matchID string) ([]match.Move, error) {
+	rows, err := queryer.Query(ctx, `SELECT m.sequence, s.color, m.player_seat_id, m.from_square,
+		m.to_square, COALESCE(m.promotion, ''), m.notation, m.position_after, m.accepted_at, m.gives_check
+		FROM moves m JOIN player_seats s ON s.id = m.player_seat_id
+		WHERE m.match_id = $1 ORDER BY m.sequence`, matchID)
+	if err != nil {
+		return nil, fmt.Errorf("load accepted moves: %w", err)
+	}
+	defer rows.Close()
+	moves := make([]match.Move, 0)
+	for rows.Next() {
+		var move match.Move
+		var color string
+		if err := rows.Scan(&move.Sequence, &color, &move.PlayerSeatID, &move.From, &move.To,
+			&move.Promotion, &move.Notation, &move.PositionAfter, &move.AcceptedAt, &move.GivesCheck); err != nil {
+			return nil, fmt.Errorf("scan accepted move: %w", err)
+		}
+		move.MatchID = matchID
+		move.Color = match.Color(color)
+		moves = append(moves, move)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate accepted moves: %w", err)
+	}
+	return moves, nil
 }
 
 func (s *MatchStore) FindExpired(ctx context.Context, _ time.Time) ([]string, error) {

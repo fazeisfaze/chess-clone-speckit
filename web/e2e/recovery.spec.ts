@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createInvitation } from "./helpers";
 
 test("a guest reload restores the current board and running clock", async ({ browser }) => {
   const hostContext = await browser.newContext();
@@ -7,9 +8,7 @@ test("a guest reload restores the current board and running clock", async ({ bro
   const guest = await guestContext.newPage();
 
   await host.goto("/");
-  await host.getByRole("button", { name: "Create match" }).click();
-  const invitation = await host.getByRole("link", { name: "Invitation link" }).getAttribute("href");
-  if (!invitation) throw new Error("invitation link missing");
+  const invitation = await createInvitation(host);
   await guest.goto(invitation);
   await guest.getByRole("button", { name: "Join match" }).click();
 
@@ -21,7 +20,7 @@ test("a guest reload restores the current board and running clock", async ({ bro
   await expect(guest.getByRole("gridcell", { name: /e4 white pawn/i })).toBeVisible();
   await expect(guest.getByText("Black to move")).toBeVisible();
   await expect(guest.getByText(/^Black \d:\d{2}$/)).toBeVisible();
-  await expect(guest.getByText("You are playing Black")).toBeVisible();
+  await expect(guest.locator(".self-strip .player-identity strong")).toHaveText("Black");
 
   await hostContext.close();
   await guestContext.close();

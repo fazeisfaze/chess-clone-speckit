@@ -1,4 +1,5 @@
 import { expect, test, type Browser } from "@playwright/test";
+import { createInvitation } from "./helpers";
 
 async function invitedPlayers(browser: Browser) {
   const hostContext = await browser.newContext();
@@ -6,9 +7,7 @@ async function invitedPlayers(browser: Browser) {
   const host = await hostContext.newPage();
   const guest = await guestContext.newPage();
   await host.goto("/");
-  await host.getByRole("button", { name: "Create match" }).click();
-  const invitation = await host.getByRole("link", { name: "Invitation link" }).getAttribute("href");
-  if (!invitation) throw new Error("invitation link missing");
+  const invitation = await createInvitation(host);
   await guest.goto(invitation);
   await guest.getByRole("button", { name: "Join match" }).click();
   return { hostContext, guestContext, host, guest };

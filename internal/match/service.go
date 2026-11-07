@@ -27,7 +27,7 @@ var (
 type Store interface {
 	Create(context.Context, Match, PlayerSeat) error
 	Join(context.Context, string, PlayerSeat) (Match, error)
-	ReadForSeat(context.Context, string, []byte) (Match, Color, error)
+	ReadForSeat(context.Context, string, []byte) (Match, Color, []Move, error)
 	ApplyMove(context.Context, string, []byte, int64, string, string, string) (Match, Move, Color, error)
 	Resign(context.Context, string, []byte) (Match, error)
 	CreateDrawOffer(context.Context, string, []byte, string) (DrawOffer, error)
@@ -42,6 +42,7 @@ type Service struct {
 type MatchResult struct {
 	Match              Match
 	Seat               PlayerSeat
+	Moves              []Move
 	InviteToken        string
 	RecoveryCredential string
 }
@@ -108,7 +109,7 @@ func (s *Service) Read(ctx context.Context, matchID, recoveryCredential string) 
 	if matchID == "" || recoveryCredential == "" {
 		return MatchResult{}, ErrInvalidSeat
 	}
-	game, color, err := s.store.ReadForSeat(ctx, matchID, digestBytes(recoveryCredential))
+	game, color, moves, err := s.store.ReadForSeat(ctx, matchID, digestBytes(recoveryCredential))
 	if err != nil {
 		return MatchResult{}, err
 	}
@@ -116,7 +117,7 @@ func (s *Service) Read(ctx context.Context, matchID, recoveryCredential string) 
 	if color == ColorWhite {
 		seatID = game.WhitePlayerID
 	}
-	return MatchResult{Match: game, Seat: PlayerSeat{ID: seatID, MatchID: game.ID, Color: color}}, nil
+	return MatchResult{Match: game, Seat: PlayerSeat{ID: seatID, MatchID: game.ID, Color: color}, Moves: moves}, nil
 }
 
 func (s *Service) ApplyMove(ctx context.Context, matchID, recoveryCredential string, expectedVersion int64, from, to, promotion string) (Match, Move, Color, error) {

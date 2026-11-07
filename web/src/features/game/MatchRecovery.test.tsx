@@ -18,6 +18,7 @@ const activeMatch = {
   version: 1,
   time_control: "5+0",
   eligible_draws: ["ThreefoldRepetition"],
+  moves: [{ sequence: 1, color: "white", from: "e2", to: "e4", notation: "e4" }],
   recovery_credential: "white-secret",
   clock: { white_remaining_ms: 300000, black_remaining_ms: 300000, active_color: "white", as_of: "2026-11-07T12:00:00Z" },
 };
@@ -33,7 +34,9 @@ describe("match recovery and actions", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("You are playing White")).toBeInTheDocument();
+    expect(await screen.findByText("You", { exact: true })).toBeInTheDocument();
+    expect(document.querySelector(".self-strip .player-identity strong")).toHaveTextContent("White");
+    expect(await screen.findByRole("region", { name: "Move history" })).toHaveTextContent("e4");
     expect(fetchMock).toHaveBeenCalledWith(
       "/matches/match-1/recover",
       expect.objectContaining({
@@ -41,6 +44,13 @@ describe("match recovery and actions", () => {
         body: JSON.stringify({ recovery_credential: "white-secret", known_version: 0 }),
       }),
     );
+  });
+
+  it("shows an empty history when recovery contains no accepted moves", async () => {
+    window.sessionStorage.setItem("online-chess-seat", JSON.stringify({ match_id: "match-1", recovery_credential: "white-secret" }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ...activeMatch, moves: [] }) }));
+    render(<App />);
+    expect(await screen.findByText("No moves yet")).toBeInTheDocument();
   });
 
   it("offers resign and draw actions in an active match", async () => {

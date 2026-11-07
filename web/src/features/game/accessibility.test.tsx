@@ -15,7 +15,6 @@ describe("chessboard keyboard and assistive technology behavior", () => {
         currentTurn="white"
         viewColor="white"
         inCheck={false}
-        clock={{ white_remaining_ms: 180000, black_remaining_ms: 180000, active_color: "white" }}
         onMove={onMove}
       />,
     );
@@ -31,18 +30,16 @@ describe("chessboard keyboard and assistive technology behavior", () => {
     expect(onMove).toHaveBeenCalledWith("e2", "e4");
   });
 
-  it("announces turn and check state through live status regions", () => {
+  it("announces check state through a live status region", () => {
     render(
       <GameBoard
         position={START}
         currentTurn="black"
         viewColor="black"
         inCheck
-        clock={{ white_remaining_ms: 180000, black_remaining_ms: 180000, active_color: "black" }}
         onMove={() => undefined}
       />,
     );
-    expect(screen.getByText("Black to move")).toHaveAttribute("aria-live", "polite");
     expect(screen.getByText("Check")).toHaveAttribute("role", "status");
   });
 });

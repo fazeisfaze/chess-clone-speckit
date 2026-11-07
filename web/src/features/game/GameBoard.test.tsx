@@ -12,7 +12,7 @@ afterEach(() => {
 const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 describe("interactive chessboard", () => {
-  it("submits a selected legal move and exposes the current turn", async () => {
+  it("submits a selected legal move", async () => {
     const user = userEvent.setup();
     const onMove = vi.fn();
     render(
@@ -21,13 +21,10 @@ describe("interactive chessboard", () => {
         currentTurn="white"
         viewColor="white"
         inCheck={false}
-        clock={{ white_remaining_ms: 180000, black_remaining_ms: 180000, active_color: "white" }}
         onMove={onMove}
       />,
     );
 
-    expect(screen.getByText(/white to move/i)).toBeInTheDocument();
-    expect(screen.getByText("White 3:00")).toBeInTheDocument();
     await user.click(screen.getByRole("gridcell", { name: /e2/ }));
     await user.click(screen.getByRole("gridcell", { name: /e4/ }));
     expect(onMove).toHaveBeenCalledWith("e2", "e4");
@@ -42,7 +39,6 @@ describe("interactive chessboard", () => {
         currentTurn="white"
         viewColor="white"
         inCheck={false}
-        clock={{ white_remaining_ms: 180000, black_remaining_ms: 180000, active_color: "white" }}
         onMove={onMove}
       />,
     );
@@ -64,9 +60,9 @@ describe("interactive chessboard", () => {
         as_of: "2026-11-07T12:00:00Z",
       }} />,
     );
-    expect(screen.getByLabelText("White clock")).toHaveTextContent("White 3:00");
+    expect(screen.getByLabelText("White clock")).toHaveTextContent(/White\s*3:00/);
     act(() => vi.advanceTimersByTime(1000));
-    expect(screen.getByLabelText("White clock")).toHaveTextContent("White 2:59");
+    expect(screen.getByLabelText("White clock")).toHaveTextContent(/White\s*2:59/);
   });
 
   it("announces when the player to move is in check", () => {
@@ -76,7 +72,6 @@ describe("interactive chessboard", () => {
         currentTurn="black"
         viewColor="black"
         inCheck
-        clock={{ white_remaining_ms: 180000, black_remaining_ms: 180000, active_color: "black" }}
         onMove={() => undefined}
       />,
     );
@@ -90,7 +85,6 @@ describe("interactive chessboard", () => {
         currentTurn="white"
         viewColor="white"
         inCheck={false}
-        clock={{ white_remaining_ms: 180000, black_remaining_ms: 180000, active_color: "white" }}
         onMove={() => undefined}
       />,
     );
@@ -98,5 +92,44 @@ describe("interactive chessboard", () => {
     const blackPiece = screen.getByRole("gridcell", { name: "a7 black pawn" });
     expect(whitePiece.querySelector(".piece-white")).not.toBeNull();
     expect(blackPiece.querySelector(".piece-black")).not.toBeNull();
+  });
+
+  it("keeps piece-side styling across both orientations and square colors", () => {
+    const position = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    for (const viewColor of ["white", "black"] as const) {
+      const { container, unmount } = render(
+        <GameBoard
+          position={position}
+          currentTurn="white"
+          viewColor={viewColor}
+          inCheck={false}
+          onMove={() => undefined}
+        />,
+      );
+      const whiteSquares = container.querySelectorAll(".piece-white");
+      const blackSquares = container.querySelectorAll(".piece-black");
+      expect(whiteSquares).toHaveLength(16);
+      expect(blackSquares).toHaveLength(16);
+      expect([...whiteSquares].some((piece) => piece.parentElement?.classList.contains("light"))).toBe(true);
+      expect([...whiteSquares].some((piece) => piece.parentElement?.classList.contains("dark"))).toBe(true);
+      expect([...blackSquares].some((piece) => piece.parentElement?.classList.contains("light"))).toBe(true);
+      expect([...blackSquares].some((piece) => piece.parentElement?.classList.contains("dark"))).toBe(true);
+      unmount();
+    }
+  });
+
+  it("highlights the origin and destination of the latest accepted move", () => {
+    render(
+      <GameBoard
+        position="rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
+        currentTurn="white"
+        viewColor="white"
+        inCheck={false}
+        lastMove={{ sequence: 2, color: "black", from: "e7", to: "e5", notation: "e5" }}
+        onMove={() => undefined}
+      />,
+    );
+    expect(screen.getByRole("gridcell", { name: "e7 empty" })).toHaveClass("last-move-from");
+    expect(screen.getByRole("gridcell", { name: "e5 black pawn" })).toHaveClass("last-move-to");
   });
 });

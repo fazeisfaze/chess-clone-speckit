@@ -35,8 +35,12 @@ export function ClockDisplay({ clock }: { clock: ClockView }) {
 
   return (
     <div className="clocks" aria-label="Match clocks">
-      <output aria-label="White clock">White {format(white)}</output>
-      <output aria-label="Black clock">Black {format(black)}</output>
+      <output className={`clock-row ${clock.active_color === "white" ? "active" : ""}`} aria-label="White clock">
+        <span>White</span><strong>{" "}{format(white)}</strong>
+      </output>
+      <output className={`clock-row ${clock.active_color === "black" ? "active" : ""}`} aria-label="Black clock">
+        <span>Black</span><strong>{" "}{format(black)}</strong>
+      </output>
     </div>
   );
 }

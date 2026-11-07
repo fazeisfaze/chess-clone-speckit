@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { createInvitation } from "./helpers";
 
 type ServerClock = {
   white_remaining_ms: number;
@@ -39,9 +40,7 @@ test("clocks on both clients stay within one second of server time in 20 matches
     const host = await hostContext.newPage();
     const guest = await guestContext.newPage();
     await host.goto("/");
-    await host.getByRole("button", { name: "Create match" }).click();
-    const invitation = await host.getByRole("link", { name: "Invitation link" }).getAttribute("href");
-    if (!invitation) throw new Error(`trial ${trial}: invitation missing`);
+    const invitation = await createInvitation(host);
     await guest.goto(invitation);
     await guest.getByRole("button", { name: "Join match" }).click();
     await expect(host.getByRole("grid", { name: "Chess board" })).toBeVisible();

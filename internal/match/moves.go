@@ -12,6 +12,7 @@ import (
 type Move struct {
 	MatchID       string
 	Sequence      int64
+	Color         Color
 	PlayerSeatID  string
 	From          string
 	To            string
@@ -66,7 +67,8 @@ func ApplyMove(game Match, seat PlayerSeat, expectedVersion int64, from, to, pro
 	}
 	move := Move{
 		MatchID: game.ID, Sequence: game.Version, PlayerSeatID: seat.ID,
-		From: from, To: to, Promotion: promotion, UCI: uci, Notation: notation,
+		Color: seat.Color,
+		From:  from, To: to, Promotion: promotion, UCI: uci, Notation: notation,
 		PositionAfter: positionAfter, AcceptedAt: acceptedAt.UTC(), GivesCheck: givesCheck,
 	}
 	game.Position = positionAfter

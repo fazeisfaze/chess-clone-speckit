@@ -166,6 +166,7 @@ match ending is consistent for both players.
 - [ ] T059 [P] Create and execute a first-use usability protocol with 10 participants, recording whether at least 9 can start a match, make a legal move, and identify the next turn without help in `specs/001-online-chess/usability-validation.md`.
 - [X] T060 Run Go tests, frontend tests, browser end-to-end tests, and formatting checks; record results in `specs/001-online-chess/quickstart.md` and RED/GREEN/regression evidence in `specs/001-online-chess/test-evidence.md`.
 - [X] T061 Validate all documented local setup and two-player timed-match scenarios in `specs/001-online-chess/quickstart.md` and fix any discrepancies in the referenced files.
+- [X] T062 [P] Upgrade the match screen into a responsive board-and-control layout with equal square cells in `web/src/features/game/GameView.tsx` and `web/src/style.css`; verify desktop/mobile layout in `web/e2e/ui-layout.spec.ts`.
 
 ---
 

@@ -85,6 +85,8 @@ Validated on 2026-11-07 with local PostgreSQL:
 - `npm test` and `npm run build` — passed.
 - `npm run test:e2e` — all 7 Chromium scenarios passed; the separate 20-match clock
   accuracy scenario passed.
+- The responsive layout check verifies a board/control sidebar on desktop and a stacked
+  layout on mobile; all 8 current Chromium scenarios pass.
 - `E2E_BASE_URL=http://127.0.0.1:8080 npm run test:e2e -- e2e/invitation.spec.ts e2e/gameplay.spec.ts`
   — both Go-served frontend scenarios passed, including the second player's move.
 - The first-use 10-participant usability study remains pending; see

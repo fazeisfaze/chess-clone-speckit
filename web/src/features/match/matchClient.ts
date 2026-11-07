@@ -6,6 +6,15 @@ export type ClockSnapshot = {
   client_received_at?: number;
 };
 
+export type MoveHistoryEntry = {
+  sequence: number;
+  color: "white" | "black";
+  from: string;
+  to: string;
+  promotion?: string;
+  notation: string;
+};
+
 export type MatchResponse = {
   match_id: string;
   status: "waiting" | "active" | "completed" | "unavailable";
@@ -18,6 +27,7 @@ export type MatchResponse = {
   clock: ClockSnapshot;
   in_check?: boolean;
   eligible_draws?: string[];
+  moves?: MoveHistoryEntry[];
 };
 
 async function postJSON<T>(path: string, body: unknown): Promise<T> {
@@ -70,6 +80,7 @@ export type MoveAccepted = {
   result?: string;
   in_check: boolean;
   eligible_draws: string[];
+  move: MoveHistoryEntry;
 };
 
 export async function submitMove(

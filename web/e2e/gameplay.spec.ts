@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createInvitation } from "./helpers";
 
 test("two players see accepted moves, turns, and clocks converge", async ({ browser }) => {
   const hostContext = await browser.newContext();
@@ -8,9 +9,7 @@ test("two players see accepted moves, turns, and clocks converge", async ({ brow
 
   await host.goto("/");
   await host.getByLabel("Time control").selectOption("3+2");
-  await host.getByRole("button", { name: "Create match" }).click();
-  const invitation = await host.getByRole("link", { name: "Invitation link" }).getAttribute("href");
-  if (!invitation) throw new Error("invitation link missing");
+  const invitation = await createInvitation(host);
   await guest.goto(invitation);
   await guest.getByRole("button", { name: "Join match" }).click();
   await expect(host.getByText("Connected", { exact: true })).toBeVisible();
@@ -32,6 +31,11 @@ test("two players see accepted moves, turns, and clocks converge", async ({ brow
   await host.getByRole("gridcell", { name: /e4.*empty/i }).click();
 
   await expect(guest.getByRole("gridcell", { name: /e4.*white pawn/i })).toBeVisible();
+  for (const page of [host, guest]) {
+    await expect(page.getByRole("gridcell", { name: /e2 empty/i })).toHaveClass(/last-move-from/);
+    await expect(page.getByRole("gridcell", { name: /e4 white pawn/i })).toHaveClass(/last-move-to/);
+    await expect(page.locator(".move-history-list li").last()).toHaveClass(/latest-move/);
+  }
   await expect(guest.getByText("Black to move")).toBeVisible();
   await expect(host.getByLabel("White clock")).toHaveText(/^White 3:\d{2}$/);
   await expect(host.getByLabel("Black clock")).toHaveText(/^Black \d:\d{2}$/);
@@ -46,6 +50,11 @@ test("two players see accepted moves, turns, and clocks converge", async ({ brow
   await guest.getByRole("gridcell", { name: /e7.*black pawn/i }).click();
   await guest.getByRole("gridcell", { name: /e5.*empty/i }).click();
   await expect(host.getByRole("gridcell", { name: /e5.*black pawn/i })).toBeVisible();
+  for (const page of [host, guest]) {
+    await expect(page.getByRole("gridcell", { name: /e7 empty/i })).toHaveClass(/last-move-from/);
+    await expect(page.getByRole("gridcell", { name: /e5 black pawn/i })).toHaveClass(/last-move-to/);
+    await expect(page.locator(".move-history-list li").last()).toHaveClass(/latest-move/);
+  }
   await expect(host.getByText("White to move")).toBeVisible();
 
   await hostContext.close();

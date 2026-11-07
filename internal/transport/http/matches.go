@@ -48,17 +48,27 @@ type clockResponse struct {
 }
 
 type matchResponse struct {
-	MatchID            string        `json:"match_id"`
-	Status             string        `json:"status"`
-	Color              string        `json:"color"`
-	Position           string        `json:"position"`
-	InviteURL          string        `json:"invite_url,omitempty"`
-	RecoveryCredential string        `json:"recovery_credential,omitempty"`
-	Version            int64         `json:"version"`
-	TimeControl        string        `json:"time_control"`
-	InCheck            bool          `json:"in_check"`
-	EligibleDraws      []string      `json:"eligible_draws"`
-	Clock              clockResponse `json:"clock"`
+	MatchID            string                `json:"match_id"`
+	Status             string                `json:"status"`
+	Color              string                `json:"color"`
+	Position           string                `json:"position"`
+	InviteURL          string                `json:"invite_url,omitempty"`
+	RecoveryCredential string                `json:"recovery_credential,omitempty"`
+	Version            int64                 `json:"version"`
+	TimeControl        string                `json:"time_control"`
+	InCheck            bool                  `json:"in_check"`
+	EligibleDraws      []string              `json:"eligible_draws"`
+	Moves              []moveHistoryResponse `json:"moves"`
+	Clock              clockResponse         `json:"clock"`
+}
+
+type moveHistoryResponse struct {
+	Sequence  int64  `json:"sequence"`
+	Color     string `json:"color"`
+	From      string `json:"from"`
+	To        string `json:"to"`
+	Promotion string `json:"promotion,omitempty"`
+	Notation  string `json:"notation"`
 }
 
 type moveResponse struct {
@@ -106,6 +116,7 @@ func (e matchEndpoints) create(w http.ResponseWriter, r *http.Request) {
 		InviteURL:          strings.TrimRight(inviteOrigin(r, e.origin), "/") + "/join#token=" + created.InviteToken,
 		RecoveryCredential: created.RecoveryCredential, Version: created.Match.Version,
 		TimeControl: created.Match.TimeControl,
+		Moves:       []moveHistoryResponse{},
 		Clock: clockResponse{
 			WhiteRemainingMS: created.Match.WhiteRemaining.Milliseconds(),
 			BlackRemainingMS: created.Match.BlackRemaining.Milliseconds(),
@@ -161,6 +172,7 @@ func (e matchEndpoints) join(w http.ResponseWriter, r *http.Request) {
 		MatchID: joined.Match.ID, Status: string(joined.Match.Status), Color: string(joined.Seat.Color),
 		Position: joined.Match.Position, RecoveryCredential: joined.RecoveryCredential,
 		Version: joined.Match.Version, TimeControl: joined.Match.TimeControl, EligibleDraws: joined.Match.EligibleDraws,
+		Moves: []moveHistoryResponse{},
 		Clock: clockResponse{
 			WhiteRemainingMS: joined.Match.WhiteRemaining.Milliseconds(),
 			BlackRemainingMS: joined.Match.BlackRemaining.Milliseconds(),
@@ -200,6 +212,7 @@ func (e matchEndpoints) get(w http.ResponseWriter, r *http.Request) {
 		Position: state.Match.Position, Version: state.Match.Version, TimeControl: state.Match.TimeControl,
 		InCheck:       state.Match.InCheck,
 		EligibleDraws: state.Match.EligibleDraws,
+		Moves:         moveHistoryResponses(state.Moves),
 		Clock: clockResponse{
 			WhiteRemainingMS: state.Match.WhiteRemaining.Milliseconds(),
 			BlackRemainingMS: state.Match.BlackRemaining.Milliseconds(),
@@ -344,23 +357,25 @@ func (e matchEndpoints) snapshot(ctx context.Context, matchID, credential string
 		asOf = time.Now().UTC()
 	}
 	response := struct {
-		Type          string        `json:"type"`
-		MatchID       string        `json:"match_id"`
-		Status        string        `json:"status"`
-		Color         string        `json:"color"`
-		Position      string        `json:"position"`
-		NextTurn      string        `json:"next_turn"`
-		Version       int64         `json:"version"`
-		TimeControl   string        `json:"time_control"`
-		InCheck       bool          `json:"in_check"`
-		EligibleDraws []string      `json:"eligible_draws"`
-		Clock         clockResponse `json:"clock"`
-		Result        string        `json:"result,omitempty"`
+		Type          string                `json:"type"`
+		MatchID       string                `json:"match_id"`
+		Status        string                `json:"status"`
+		Color         string                `json:"color"`
+		Position      string                `json:"position"`
+		NextTurn      string                `json:"next_turn"`
+		Version       int64                 `json:"version"`
+		TimeControl   string                `json:"time_control"`
+		InCheck       bool                  `json:"in_check"`
+		EligibleDraws []string              `json:"eligible_draws"`
+		Moves         []moveHistoryResponse `json:"moves"`
+		Clock         clockResponse         `json:"clock"`
+		Result        string                `json:"result,omitempty"`
 	}{
 		Type: "match_snapshot", MatchID: state.Match.ID, Status: string(state.Match.Status),
 		Color: string(state.Seat.Color), Position: state.Match.Position,
 		NextTurn: turnFromPosition(state.Match.Position), Version: state.Match.Version,
-		TimeControl: state.Match.TimeControl, InCheck: state.Match.InCheck, EligibleDraws: state.Match.EligibleDraws, Result: state.Match.Result,
+		TimeControl: state.Match.TimeControl, InCheck: state.Match.InCheck, EligibleDraws: state.Match.EligibleDraws,
+		Moves: moveHistoryResponses(state.Moves), Result: state.Match.Result,
 		Clock: clockResponse{
 			WhiteRemainingMS: state.Match.WhiteRemaining.Milliseconds(),
 			BlackRemainingMS: state.Match.BlackRemaining.Milliseconds(),
@@ -368,6 +383,17 @@ func (e matchEndpoints) snapshot(ctx context.Context, matchID, credential string
 		},
 	}
 	return json.Marshal(response)
+}
+
+func moveHistoryResponses(moves []match.Move) []moveHistoryResponse {
+	responses := make([]moveHistoryResponse, 0, len(moves))
+	for _, move := range moves {
+		responses = append(responses, moveHistoryResponse{
+			Sequence: move.Sequence, Color: string(move.Color), From: move.From, To: move.To,
+			Promotion: move.Promotion, Notation: move.Notation,
+		})
+	}
+	return responses
 }
 
 func (e matchEndpoints) resign(w http.ResponseWriter, r *http.Request) {

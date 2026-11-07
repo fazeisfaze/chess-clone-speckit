@@ -45,6 +45,9 @@ func TestRecoverSeatReturnsAuthoritativeBoardAndRunningClock(t *testing.T) {
 	if _, err := service.Join(ctx, created.InviteToken); err != nil {
 		t.Fatal(err)
 	}
+	if _, _, _, err := service.ApplyMove(ctx, created.Match.ID, created.RecoveryCredential, 1, "e2", "e4", ""); err != nil {
+		t.Fatalf("accept first move: %v", err)
+	}
 	if _, err := pool.Exec(ctx, `UPDATE matches SET clock_started_at = clock_timestamp() - interval '10 seconds' WHERE id = $1`, created.Match.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +67,14 @@ func TestRecoverSeatReturnsAuthoritativeBoardAndRunningClock(t *testing.T) {
 		Color    string `json:"color"`
 		Position string `json:"position"`
 		Version  int64  `json:"version"`
-		Clock    struct {
+		Moves    []struct {
+			Sequence int64  `json:"sequence"`
+			Color    string `json:"color"`
+			From     string `json:"from"`
+			To       string `json:"to"`
+			Notation string `json:"notation"`
+		} `json:"moves"`
+		Clock struct {
 			WhiteRemainingMS int64  `json:"white_remaining_ms"`
 			ActiveColor      string `json:"active_color"`
 		} `json:"clock"`
@@ -74,8 +84,11 @@ func TestRecoverSeatReturnsAuthoritativeBoardAndRunningClock(t *testing.T) {
 		t.Fatal(err)
 	}
 	response.Body.Close()
-	if response.StatusCode != http.StatusOK || snapshot.Status != "active" || snapshot.Color != "white" || snapshot.Version != 1 || snapshot.Clock.ActiveColor != "white" {
+	if response.StatusCode != http.StatusOK || snapshot.Status != "active" || snapshot.Color != "white" || snapshot.Version != 2 || snapshot.Clock.ActiveColor != "black" {
 		t.Fatalf("recovery response status=%d snapshot=%+v", response.StatusCode, snapshot)
+	}
+	if len(snapshot.Moves) != 1 || snapshot.Moves[0].Sequence != 1 || snapshot.Moves[0].Color != "white" || snapshot.Moves[0].From != "e2" || snapshot.Moves[0].To != "e4" || snapshot.Moves[0].Notation != "e4" {
+		t.Fatalf("recovered moves = %+v, want accepted 1. e4", snapshot.Moves)
 	}
 	if snapshot.Position == "" || snapshot.Clock.WhiteRemainingMS >= 300_000 || snapshot.Clock.WhiteRemainingMS <= 280_000 {
 		t.Fatalf("recovered position/clock = %q/%d", snapshot.Position, snapshot.Clock.WhiteRemainingMS)

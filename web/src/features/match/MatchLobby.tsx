@@ -49,6 +49,7 @@ export function MatchLobby() {
   const [timeControl, setTimeControl] = useState<MatchResponse["time_control"]>("5+0");
   const [match, setMatch] = useState<MatchResponse | null>(null);
   const [inviteURL, setInviteURL] = useState("");
+  const [copyFeedback, setCopyFeedback] = useState<"success" | "failure" | "">("");
   const [savedSeat] = useState(() => {
     try {
       const raw = window.sessionStorage.getItem("online-chess-seat");
@@ -95,6 +96,7 @@ export function MatchLobby() {
 
   async function handleCreate() {
     setError("");
+    setCopyFeedback("");
     try {
       const created = await createMatch(timeControl);
       setMatch(created);
@@ -106,6 +108,17 @@ export function MatchLobby() {
       }));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to create match.");
+    }
+  }
+
+  async function handleCopyInvitation() {
+    setCopyFeedback("");
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(inviteURL);
+      setCopyFeedback("success");
+    } catch {
+      setCopyFeedback("failure");
     }
   }
 
@@ -151,7 +164,13 @@ export function MatchLobby() {
       {match?.status === "waiting" && (
         <div className="waiting-match">
           <p>Waiting for an opponent</p>
-          <a href={inviteURL}>Invitation link</a>
+          {inviteURL && (
+            <div className="invitation-copy">
+              <button type="button" onClick={handleCopyInvitation}>Copy invitation link</button>
+              {copyFeedback === "success" && <p role="status">Invitation link copied.</p>}
+              {copyFeedback === "failure" && <p role="alert">Could not copy invitation link. Check clipboard permissions and try again.</p>}
+            </div>
+          )}
           <p>White {formatClock(match.clock.white_remaining_ms)}</p>
           <StartingBoard />
         </div>

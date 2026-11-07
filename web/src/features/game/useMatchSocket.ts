@@ -14,6 +14,7 @@ function initialState(match: MatchResponse): MatchState {
     timeControl: match.time_control,
     inCheck: match.in_check ?? false,
     eligibleDraws: match.eligible_draws ?? [],
+    moves: match.moves ?? [],
     clock: { ...match.clock, client_received_at: Date.now() },
     result: "",
     drawOffer: null,
@@ -74,6 +75,7 @@ export function useMatchSocket(match: MatchResponse, recoveryCredential: string)
           time_control: snapshot.time_control,
           in_check: snapshot.in_check ?? false,
           eligible_draws: snapshot.eligible_draws ?? [],
+          moves: snapshot.moves ?? [],
           clock: snapshot.clock,
         });
       }

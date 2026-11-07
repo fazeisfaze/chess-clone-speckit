@@ -11,6 +11,7 @@ const initial: MatchState = {
   timeControl: "3+2",
   inCheck: false,
   eligibleDraws: [],
+  moves: [],
   clock: {
     white_remaining_ms: 180000,
     black_remaining_ms: 180000,
@@ -41,25 +42,30 @@ describe("match realtime reducer", () => {
       result: "",
       in_check: false,
       eligible_draws: [],
+      move: { sequence: 1, color: "white", from: "e2", to: "e4", notation: "e4" },
     });
     expect(next.position).toBe("after-e4");
     expect(next.currentTurn).toBe("black");
     expect(next.clock.white_remaining_ms).toBe(171000);
     expect(next.version).toBe(2);
+    expect(next.moves).toEqual([{ sequence: 1, color: "white", from: "e2", to: "e4", notation: "e4" }]);
   });
 
   it("ignores duplicate events and requests synchronization on a version gap", () => {
     const duplicate = matchReducer(initial, {
       type: "move_accepted", version: 1, position: "stale", next_turn: "black",
       clock: initial.clock, result: "", in_check: false, eligible_draws: [],
+      move: { sequence: 1, color: "white", from: "e2", to: "e4", notation: "e4" },
     });
     expect(duplicate).toBe(initial);
     const gap = matchReducer(initial, {
       type: "move_accepted", version: 3, position: "unknown", next_turn: "black",
       clock: initial.clock, result: "", in_check: false, eligible_draws: [],
+      move: { sequence: 3, color: "white", from: "d2", to: "d4", notation: "d4" },
     });
     expect(gap.syncRequired).toBe(true);
     expect(gap.position).toBe(initial.position);
+    expect(gap.moves).toEqual([]);
   });
 
   it("records a server rejection without mutating board or clocks", () => {
@@ -67,6 +73,24 @@ describe("match realtime reducer", () => {
     expect(rejected.error).toBe("illegal move");
     expect(rejected.position).toBe(initial.position);
     expect(rejected.clock).toBe(initial.clock);
+    expect(rejected.moves).toEqual([]);
+  });
+
+  it("restores an empty history when an older match snapshot omits moves", () => {
+    const restored = matchReducer(initial, {
+      type: "match_snapshot",
+      match_id: "match-1",
+      status: "active",
+      color: "white",
+      position: "start-fen",
+      next_turn: "white",
+      version: 1,
+      time_control: "3+2",
+      in_check: false,
+      eligible_draws: [],
+      clock: initial.clock,
+    });
+    expect(restored.moves).toEqual([]);
   });
 
   it("applies a terminal event for the version already applied by the final move", () => {

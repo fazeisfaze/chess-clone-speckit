@@ -1,12 +1,12 @@
 import { useState, type KeyboardEvent } from "react";
-import { ClockDisplay, type ClockView } from "./ClockDisplay";
+import type { MoveHistoryEntry } from "../match/matchClient";
 
 export type GameBoardProps = {
   position: string;
   currentTurn: "white" | "black";
   viewColor: "white" | "black";
   inCheck: boolean;
-  clock: ClockView;
+  lastMove?: MoveHistoryEntry | null;
   onMove: (from: string, to: string, promotion?: string) => void;
 };
 
@@ -42,12 +42,15 @@ function parsePosition(fen: string) {
   return pieces;
 }
 
-export function GameBoard({ position, currentTurn, viewColor, inCheck, clock, onMove }: GameBoardProps) {
+export function GameBoard({ position, currentTurn, viewColor, inCheck, lastMove, onMove }: GameBoardProps) {
   const [selected, setSelected] = useState<string | null>(null);
   const [promotion, setPromotion] = useState<{ from: string; to: string } | null>(null);
   const pieces = parsePosition(position);
   const files = viewColor === "white" ? "abcdefgh" : "hgfedcba";
   const ranks = viewColor === "white" ? "87654321" : "12345678";
+  const checkedKing = inCheck
+    ? [...pieces.entries()].find(([, piece]) => piece === (currentTurn === "white" ? "K" : "k"))?.[0]
+    : undefined;
 
   function chooseSquare(square: string) {
     const piece = pieces.get(square);
@@ -90,10 +93,8 @@ export function GameBoard({ position, currentTurn, viewColor, inCheck, clock, on
   }
 
   return (
-    <section className="game-board-panel" aria-label="Chess game">
-      <p className="turn-status" aria-live="polite">{currentTurn === "white" ? "White" : "Black"} to move</p>
+    <section className="game-board-panel" aria-label="Chessboard">
       {inCheck && <p className="check-status" role="status">Check</p>}
-      <ClockDisplay clock={clock} />
       <div className="chess-board" role="grid" aria-label="Chess board">
         {ranks.split("").flatMap((rank, row) =>
           files.split("").map((file, column) => {
@@ -101,12 +102,13 @@ export function GameBoard({ position, currentTurn, viewColor, inCheck, clock, on
             const code = pieces.get(square);
             const piece = code ? PIECES[code] : undefined;
             const squareColor = (row + column) % 2 ? "dark" : "light";
+            const lastMoveClass = lastMove?.from === square ? " last-move-from" : lastMove?.to === square ? " last-move-to" : "";
             return (
               <button
                 type="button"
                 role="gridcell"
-                className={`board-square ${squareColor}${selected === square ? " selected" : ""}`}
-                aria-label={`${square} ${piece?.name ?? "empty"}`}
+                className={`board-square ${squareColor}${selected === square ? " selected" : ""}${checkedKing === square ? " checked-king" : ""}${lastMoveClass}`}
+                aria-label={`${square} ${piece?.name ?? "empty"}${checkedKing === square ? ", in check" : ""}`}
                 aria-selected={selected === square}
                 key={square}
                 onClick={() => chooseSquare(square)}

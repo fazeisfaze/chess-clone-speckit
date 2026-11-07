@@ -1,4 +1,5 @@
 import type { ClockView } from "./ClockDisplay";
+import type { MoveHistoryEntry } from "../match/matchClient";
 
 export type MatchState = {
   matchId: string;
@@ -10,6 +11,7 @@ export type MatchState = {
   timeControl: "3+2" | "5+0" | "10+0";
   inCheck: boolean;
   eligibleDraws: string[];
+  moves: MoveHistoryEntry[];
   clock: ClockView;
   result: string;
   drawOffer: { offer_id: string; offering_color: "white" | "black" } | null;
@@ -28,6 +30,7 @@ type MoveEvent = {
   result: string;
   in_check: boolean;
   eligible_draws: string[];
+  move: MoveHistoryEntry;
 };
 
 type RealtimeEvent = MoveEvent
@@ -43,6 +46,7 @@ type RealtimeEvent = MoveEvent
 		time_control: MatchState["timeControl"];
 		in_check: boolean;
 		eligible_draws: string[];
+		moves?: MoveHistoryEntry[];
 		clock: ClockView;
 		result?: string;
 	}
@@ -71,6 +75,7 @@ export function matchReducer(state: MatchState, event: RealtimeEvent): MatchStat
 		return { ...state, opponentConnected: event.connected };
 	}
 	if (event.type === "match_snapshot") {
+		if (event.version < state.version) return state;
 		return {
 			matchId: event.match_id,
 			status: event.status,
@@ -81,6 +86,7 @@ export function matchReducer(state: MatchState, event: RealtimeEvent): MatchStat
 			timeControl: event.time_control,
 			inCheck: event.in_check,
 			eligibleDraws: event.eligible_draws,
+			moves: event.moves ?? [],
 			clock: event.clock,
 			result: event.result ?? "",
 			drawOffer: null,
@@ -99,6 +105,7 @@ export function matchReducer(state: MatchState, event: RealtimeEvent): MatchStat
 	return {
 		...state,
 		position: event.position,
+		moves: [...state.moves, event.move],
 		inCheck: event.in_check,
 		eligibleDraws: event.eligible_draws,
 		currentTurn: event.next_turn,

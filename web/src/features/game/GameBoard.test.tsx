@@ -82,4 +82,21 @@ describe("interactive chessboard", () => {
     );
     expect(screen.getByText("Check")).toBeInTheDocument();
   });
+
+  it("styles each piece by side rather than inheriting the square color", () => {
+    render(
+      <GameBoard
+        position={START}
+        currentTurn="white"
+        viewColor="white"
+        inCheck={false}
+        clock={{ white_remaining_ms: 180000, black_remaining_ms: 180000, active_color: "white" }}
+        onMove={() => undefined}
+      />,
+    );
+    const whitePiece = screen.getByRole("gridcell", { name: "a2 white pawn" });
+    const blackPiece = screen.getByRole("gridcell", { name: "a7 black pawn" });
+    expect(whitePiece.querySelector(".piece-white")).not.toBeNull();
+    expect(blackPiece.querySelector(".piece-black")).not.toBeNull();
+  });
 });

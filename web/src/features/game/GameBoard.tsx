@@ -112,7 +112,7 @@ export function GameBoard({ position, currentTurn, viewColor, inCheck, clock, on
                 onClick={() => chooseSquare(square)}
                 onKeyDown={moveGridFocus}
               >
-                {piece?.glyph ?? ""}
+                {piece && <span className={`piece-${piece.color}`} aria-hidden="true">{piece.glyph}</span>}
               </button>
             );
           }),

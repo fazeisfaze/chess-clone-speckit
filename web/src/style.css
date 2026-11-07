@@ -19,3 +19,5 @@ button { color: #fff; background: #26734d; cursor: pointer; }
 .board-square.selected { outline: 3px solid #e3b341; outline-offset: -3px; }
 .board-square.light { color: #222; background: #e8edf0; }
 .board-square.dark { color: #fff; background: #557b68; }
+.piece-white { color: #fff8e7; -webkit-text-stroke: 1px #25323b; text-shadow: 0 1px 2px #17212b; }
+.piece-black { color: #17212b; -webkit-text-stroke: .5px #17212b; text-shadow: 0 1px 0 #fff8e7; }

@@ -170,19 +170,22 @@ verify the current position, then test resignation and an agreed draw in separat
 
 ### Measurable Outcomes
 
-- **SC-001**: Two players can create and join a match and see the starting board within
-  60 seconds in at least 95% of validation attempts on a stable connection.
-- **SC-002**: In a 20-move test game, both players' boards show the same accepted move
-  within 2 seconds in at least 99% of moves on a stable connection.
-- **SC-003**: All legal and illegal moves in the standard chess rules test set are
-  respectively accepted and rejected, with no disagreement between the two players' views.
-- **SC-004**: A player who reconnects within 5 minutes of a temporary disconnection can
-  resume the same active match at its latest accepted position in at least 95% of tests.
-- **SC-005**: At least 90% of first-time test participants can start a match, make a legal
+- **SC-001**: In 20 validation attempts on a stable connection, at least 19 pairs of
+  players create and join a match and see the starting board within 60 seconds.
+- **SC-002**: Across 20 test games of 20 accepted moves each (400 moves total), both
+  players see the same accepted move within 2 seconds for at least 396 moves.
+- **SC-003**: Every position and move case in the project-maintained standard-chess
+  conformance fixture set is adjudicated as expected, with no disagreement between the
+  players' displayed positions. The set covers legal and illegal moves, special moves,
+  check, terminal positions, and recognized draw conditions.
+- **SC-004**: In 20 tests where a player reconnects within 5 minutes of a temporary
+  disconnection, at least 19 restore the same active match, latest accepted position, and
+  current clock state.
+- **SC-005**: At least 9 of 10 first-time test participants can start a match, make a legal
   move, and identify whose turn follows without assistance.
-- **SC-006**: In timed-match validation, both players' displayed clocks remain within
-  1 second of the server-authoritative remaining time, and both clients show the same
-  expiration result in 100% of tested timeouts.
+- **SC-006**: Across 20 timed-match timeout tests, both displayed clocks remain within
+  1 second of server-authoritative remaining time and both clients show the same timeout
+  result in all 20 tests.
 
 ## Assumptions
 

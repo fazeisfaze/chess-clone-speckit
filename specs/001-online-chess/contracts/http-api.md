@@ -85,8 +85,8 @@ Requires seat authorization.
 }
 ```
 
-Success returns the accepted move, resulting position, next turn, version, updated clock
-snapshot, and game result if terminal. Invalid/illegal/out-of-turn moves return `422`; stale
+Success returns the accepted move, resulting position, next turn, version, check status,
+updated clock snapshot, and game result if terminal. Invalid/illegal/out-of-turn moves return `422`; stale
 versions return `409`. The server determines move-vs-timeout order after serializing the
 command for the match; client timestamps are ignored.
 Neither error may change match state. A successful move is persisted before success is

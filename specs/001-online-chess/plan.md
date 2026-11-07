@@ -38,9 +38,10 @@ server platform; PostgreSQL
 
 **Project Type**: Web application (Go backend and browser frontend)
 
-**Performance Goals**: Match creation and joining within 60 seconds in at least 95% of
-stable-connection validation attempts; accepted moves visible to both players within
-2 seconds in at least 99% of a 20-move test game, per the feature spec.
+**Performance Goals**: In 20 stable-connection match attempts, at least 19 pairs join
+within 60 seconds; across 400 accepted moves, at least 396 are visible to both players
+within 2 seconds. Detailed samples and clock/reconnect thresholds are in `spec.md` SC-001,
+SC-002, SC-004, and SC-006.
 
 **Constraints**: Server validates every move and owns canonical game state. Commit an
 accepted move, resulting position, and clock update atomically. Use a persisted timestamp
@@ -60,7 +61,8 @@ with durable PostgreSQL state. No total user or match-volume target is specified
 
 - **TDD (NON-NEGOTIABLE)**: PASS — implementation work must start with a focused failing
   test, demonstrate the expected failure, then proceed through minimal implementation and
-  green verification before refactoring.
+  green verification before refactoring. Record RED, GREEN, and regression results for each
+  behavior change in `specs/001-online-chess/test-evidence.md`.
 - **Chess Rules Correctness**: PASS — use a rules adapter and verify special moves,
   check/checkmate, stalemate, and claimable versus automatic draw behavior with tests.
 - **Integration Confidence**: PASS — plan includes persistence and multi-client integration
@@ -85,6 +87,8 @@ specs/001-online-chess/
 ├── research.md
 ├── data-model.md
 ├── quickstart.md
+├── test-evidence.md
+├── usability-validation.md # Created and completed during final acceptance validation
 └── contracts/
     ├── http-api.md
     └── websocket-events.md

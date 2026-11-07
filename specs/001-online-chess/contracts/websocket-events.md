@@ -50,8 +50,8 @@ accepted only when validated against authoritative position and move history.
 
 - `match_ready`: second seat joined; includes opposing colors, initial position, version,
   chosen clock control, initial remaining times, White as active color, and server timestamp.
-- `move_accepted`: accepted move, resulting position, next turn, version, updated clock
-  snapshot, and optional result.
+- `move_accepted`: accepted move, resulting position, next turn, version, whether the move
+  gives check, updated clock snapshot, and optional result.
 - `action_rejected`: private error code/message; no state change.
 - `draw_offer`: offer identifier and offering color.
 - `draw_resolved`: offer outcome and current match status.

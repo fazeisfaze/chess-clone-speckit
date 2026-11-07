@@ -1,0 +1,47 @@
+[
+  {
+    "name": "initial-position",
+    "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "legal_moves": ["e2e4"],
+    "illegal_moves": ["e2e5", "e7e5"]
+  },
+  {
+    "name": "castling",
+    "fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
+    "legal_moves": ["e1g1", "e1c1"],
+    "illegal_moves": ["e1g3"]
+  },
+  {
+    "name": "en-passant",
+    "fen": "8/8/8/3pP3/8/8/8/K6k w - d6 0 1",
+    "legal_moves": ["e5d6"],
+    "illegal_moves": ["e5d5"]
+  },
+  {
+    "name": "promotion-choices",
+    "fen": "4k3/P7/8/8/8/8/8/4K3 w - - 0 1",
+    "legal_moves": ["a7a8q", "a7a8r", "a7a8b", "a7a8n"],
+    "illegal_moves": ["a7a8k", "a7a8"]
+  },
+  {
+    "name": "fools-mate-checkmate",
+    "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "sequence": ["f2f3", "e7e5", "g2g4", "d8h4"],
+    "outcome": "0-1",
+    "method": "Checkmate"
+  },
+  {
+    "name": "stalemate",
+    "fen": "k7/8/1QK5/8/8/8/8/8 b - - 0 1",
+    "sequence": [],
+    "outcome": "1/2-1/2",
+    "method": "Stalemate"
+  },
+  {
+    "name": "insufficient-material",
+    "fen": "8/8/8/8/8/8/4k3/7K w - - 0 1",
+    "sequence": [],
+    "outcome": "1/2-1/2",
+    "method": "InsufficientMaterial"
+  }
+]

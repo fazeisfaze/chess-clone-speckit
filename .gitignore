@@ -1,0 +1,28 @@
+# Local secrets and environment configuration
+.env
+.env.*
+!.env.example
+
+# Go
+*.exe
+*.test
+*.out
+*.tsbuildinfo
+/bin/
+/vendor/
+
+# Node, Vite, and tests
+web/node_modules/
+web/dist/
+web/coverage/
+web/playwright-report/
+web/test-results/
+
+# Logs and editor/OS files
+*.log
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/

@@ -24,7 +24,8 @@ implementation phase initializes the project.
    - **Expected**: both browser clients complete the scenarios below without diverging state.
 
 Per the project constitution, every behavior change must first be covered by a focused test
-that fails for the expected reason. Record the failing and passing results for each change.
+that fails for the expected reason. Record the failing output before implementation, passing
+output afterward, and regression results in [test-evidence.md](test-evidence.md).
 
 ## Two-player match validation
 
@@ -39,8 +40,8 @@ that fails for the expected reason. Record the failing and passing results for e
    2 seconds. Verify the 3+2 increment is applied to the mover exactly once.
 8. Attempt an illegal, out-of-turn, duplicate, and late move; verify none can alter the
    board or improperly change a clock.
-9. Exercise castling, en passant, promotion, checkmate, stalemate, and draw behavior using
-   the documented test positions.
+9. Exercise castling, en passant, promotion, non-terminal check, checkmate, stalemate, and
+   draw behavior using the documented test positions; verify both clients see check status.
 10. Disconnect and reconnect one session during an active clock; verify it recovers the
     latest position and correct server-derived remaining times without pausing the game.
 11. Allow a clock to expire with both clients connected; verify both receive the same result

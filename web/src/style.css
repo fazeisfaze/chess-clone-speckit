@@ -1,0 +1,20 @@
+:root {
+  color: #edf2f4;
+  background: #121b22;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+.app-shell { width: min(100% - 2rem, 72rem); margin: 0 auto; padding: 2rem 0; }
+.match-lobby, .match-room { display: grid; gap: 1rem; justify-items: center; }
+.create-match { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+button, select { border: 1px solid #49616f; border-radius: .5rem; padding: .65rem .9rem; font: inherit; }
+button { color: #fff; background: #26734d; cursor: pointer; }
+.clocks { display: flex; gap: 1rem; font-variant-numeric: tabular-nums; }
+.chess-board { display: grid; grid-template-columns: repeat(8, minmax(2rem, 4.5rem)); width: min(90vw, 36rem); aspect-ratio: 1; }
+.board-square { display: grid; place-items: center; font-size: clamp(1.4rem, 6vw, 3rem); }
+.board-square.light { color: #222; background: #e8edf0; }
+.board-square.dark { color: #fff; background: #557b68; }

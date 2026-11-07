@@ -51,7 +51,8 @@ mutating actions and match-private state.
 
 ## Move
 
-Represents an accepted action and its place in authoritative match history.
+Represents an accepted action, whether it leaves the opposing king in check, and its place
+in authoritative match history.
 
 | Field | Meaning and validation |
 |---|---|
@@ -62,6 +63,7 @@ Represents an accepted action and its place in authoritative match history.
 | `promotion` | Optional; if present, only queen, rook, bishop, or knight. |
 | `notation` | Human-readable move notation generated from the accepted move. |
 | `position_after` | Resulting canonical position committed atomically with the move. |
+| `gives_check` | Whether the resulting position leaves the opposing king in check. |
 | `accepted_at` | Server timestamp. |
 
 Rejected, duplicate, out-of-turn, stale-version, and post-completion move commands do not
